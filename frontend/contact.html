@@ -1,0 +1,99 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — SynapseCloud</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/public/index.css" />
+  <link rel="stylesheet" href="css/public/contact.css" />
+  <link rel="stylesheet" href="css/particles.css" />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+</head>
+<body>
+
+  <div id="navbar-placeholder"></div>
+
+  <main class="page-main">
+
+    <section class="page-hero">
+      <div id="hero-particles" class="particles-container"></div>
+      <div class="page-container">
+        <span class="section-tag">Get In Touch</span>
+        <h1 class="page-title">We'd love to <span class="accent">hear from you.</span></h1>
+        <p class="page-desc">Have a question or feedback? Fill out the form and we'll get back to you as soon as possible.</p>
+      </div>
+    </section>
+
+    <section class="contact-section">
+      <div class="page-container">
+        <div class="contact-grid">
+
+          <div class="contact-info">
+            <h2 class="contact-info-title">Other ways to reach us</h2>
+            <div class="contact-item">
+              <img src="assets/icons/mail.svg" alt="Email" class="contact-icon" />
+              <div>
+                <div class="contact-item-label">Email</div>
+                <div class="contact-item-value">yusufbaskeser2005@gmail.com</div>
+              </div>
+            </div>
+            <div class="contact-item">
+              <img src="assets/icons/github.svg" alt="GitHub" class="contact-icon" />
+              <div>
+                <div class="contact-item-label">GitHub</div>
+                <div class="contact-item-value">github.com/synapsecloud</div>
+              </div>
+            </div>
+            <div class="contact-item">
+              <img src="assets/icons/instagram.svg" alt="Instagram" class="contact-icon" />
+              <div>
+                <div class="contact-item-label">Instagram</div>
+                <div class="contact-item-value">@synapsecloud</div>
+              </div>
+            </div>
+          </div>
+
+          <form class="contact-form" id="contactForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">First Name</label>
+                <input type="text" id="firstName" class="form-input" placeholder="Alex" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Last Name</label>
+                <input type="text" id="lastName" class="form-input" placeholder="Morgan" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" id="email" class="form-input" placeholder="alex@example.com" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Subject</label>
+              <input type="text" id="subject" class="form-input" placeholder="How can we help?" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Message</label>
+              <textarea id="message" class="form-input form-textarea" placeholder="Tell us more..." required></textarea>
+            </div>
+            <div class="form-status" id="formStatus"></div>
+            <button type="submit" class="btn-submit">Send Message</button>
+          </form>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="vendor/tsparticles.min.js"></script>
+  <script src="js/shared/particles.js"></script>
+  <script src="js/public/index.js"></script>
+  <script src="js/public/contact.js"></script>
+
+</body>
+</html>

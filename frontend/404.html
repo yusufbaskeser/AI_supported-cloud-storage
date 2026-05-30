@@ -1,0 +1,134 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>404 — Page Not Found | SynapseCloud</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/main.css" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      animation: pageFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .error-code {
+      font-size: clamp(5rem, 15vw, 9rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--accent);
+      line-height: 1;
+      opacity: 0.18;
+      user-select: none;
+    }
+
+    .error-title {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-top: -16px;
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .error-desc {
+      font-size: 0.97rem;
+      color: var(--text-sub);
+      max-width: 380px;
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    .error-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-home {
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.12s;
+    }
+
+    .btn-home:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-back {
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--text-sub);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 24px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-back:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .error-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 48px;
+      text-decoration: none;
+    }
+
+    .error-logo img {
+      width: 26px;
+      height: 26px;
+      object-fit: contain;
+    }
+
+    .error-logo span {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .error-logo .accent { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <a href="index" class="error-logo">
+    <img src="assets/logo.png" alt="SynapseCloud" />
+    <span>Synapse<span class="accent">Cloud</span></span>
+  </a>
+
+  <div class="error-code">404</div>
+  <h1 class="error-title">Page not found</h1>
+  <p class="error-desc">The page you're looking for doesn't exist or has been moved. Let's get you back on track.</p>
+
+  <div class="error-actions">
+    <a href="index" class="btn-home">Go to Home</a>
+    <a href="javascript:history.back()" class="btn-back">Go Back</a>
+  </div>
+
+</body>
+</html>

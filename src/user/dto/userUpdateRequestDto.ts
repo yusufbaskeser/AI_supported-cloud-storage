@@ -1,6 +1,5 @@
 import {
   IsString,
-  IsEmail,
   IsOptional,
   MinLength,
   MaxLength,
@@ -16,7 +15,11 @@ export class UserUpdateRequestDto {
   name?: string;
 
   @IsOptional()
-  @IsEmail()
-  @IsNotEmpty()
-  email?: string;
+  @IsString()
+  @MinLength(8, { message: 'Password must be at least 8 characters long.' })
+  password?: string;
+
+  @IsOptional()
+  @IsString()
+  profile_photo?: string;
 }

@@ -1,0 +1,159 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In Required | SynapseCloud</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/main.css" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+  <script>
+    (function() {
+      const token = localStorage.getItem('sc-token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          if (payload.exp * 1000 > Date.now()) {
+            window.location.replace('/dashboard.html');
+          }
+        } catch(e) {}
+      }
+    })();
+  </script>
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      animation: pageFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .error-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 48px;
+      text-decoration: none;
+    }
+
+    .error-logo img {
+      width: 26px;
+      height: 26px;
+      object-fit: contain;
+    }
+
+    .error-logo span {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .error-logo .accent { color: var(--accent); }
+
+    .lock-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 28px;
+    }
+
+    .lock-icon svg {
+      width: 34px;
+      height: 34px;
+      stroke: var(--accent);
+    }
+
+    .error-title {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .error-desc {
+      font-size: 0.97rem;
+      color: var(--text-sub);
+      max-width: 360px;
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    .error-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      padding: 12px 28px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, transform 0.12s;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      font-family: inherit;
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--text-sub);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 28px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+  <a href="index" class="error-logo">
+    <img src="assets/logo.png" alt="SynapseCloud" />
+    <span>Synapse<span class="accent">Cloud</span></span>
+  </a>
+
+  <div class="lock-icon">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  </div>
+
+  <h1 class="error-title">Sign in required</h1>
+  <p class="error-desc">You need to be signed in to access this page. Please log in or create a free account to continue.</p>
+
+  <div class="error-actions">
+    <a href="login" class="btn-primary">Sign In</a>
+    <a href="register" class="btn-secondary">Create Account</a>
+  </div>
+
+</body>
+</html>

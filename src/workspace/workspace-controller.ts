@@ -7,21 +7,24 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
   Request,
 } from '@nestjs/common';
 import { WorkspaceService } from './workspace-service';
 import { JwtAuthGuard } from '../guard/jwt-auth-guard';
+import { UserCacheInterceptor } from '../interceptors/redisInterceptor';
 import { CreateWorkspaceDto } from './dto/create-request-workspace-dto';
 import { UpdateWorkspaceDto } from './dto/update-request-workspace-dto';
 import { WorkspaceResponseDto } from './dto/workspace-response-dto';
 import { DeleteWorkspaceResponseDto } from './dto/delete-workspace-response-dto';
 
-@Controller('workspaces')
 @UseGuards(JwtAuthGuard)
+@Controller({ path: 'workspaces', version: '1' })
 export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
 
   @Get()
+  @UseInterceptors(UserCacheInterceptor)
   async getAllWorkspaces(@Request() req): Promise<WorkspaceResponseDto[]> {
     return this.workspaceService.findAllWorkspacesByUser(req.user.user_id);
   }
@@ -39,7 +42,6 @@ export class WorkspaceController {
     @Body() createDto: CreateWorkspaceDto,
     @Request() req,
   ): Promise<WorkspaceResponseDto> {
-    console.log('Gelen body:', createDto);
     return this.workspaceService.createWorkspace(createDto, req.user.user_id);
   }
 

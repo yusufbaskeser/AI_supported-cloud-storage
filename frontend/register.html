@@ -1,0 +1,140 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Register — SynapseCloud</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/public/auth.css" />
+  <link rel="stylesheet" href="css/particles.css" />
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+</head>
+<body class="auth-body">
+
+  <div class="auth-layout">
+
+    <div class="auth-form-side">
+      <div class="auth-top-bar">
+        <a href="index" class="auth-back-link">← Back to home</a>
+        <button class="theme-toggle" id="themeToggle">
+          <img src="assets/icons/sun.svg" alt="Toggle theme" id="themeIcon" />
+        </button>
+      </div>
+
+      <div class="auth-form-wrapper">
+        <div class="auth-header">
+          <h1 class="auth-title">Create your account</h1>
+          <p class="auth-subtitle">Get started for free. No credit card needed.</p>
+        </div>
+
+        <div id="stepRegister">
+          <form class="auth-form" id="registerForm">
+
+            <div class="avatar-picker-wrap">
+              <div class="avatar-picker" id="avatarPreview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <label class="avatar-picker-btn" for="avatarInput">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Upload photo
+              </label>
+              <input type="file" id="avatarInput" accept="image/*" style="display:none;" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Username</label>
+              <div class="input-wrapper">
+                <img src="assets/icons/user.svg" class="input-icon" alt="" />
+                <input type="text" id="username" class="form-input" placeholder="Choose a username" required autocomplete="username" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <div class="input-wrapper">
+                <img src="assets/icons/mail.svg" class="input-icon" alt="" />
+                <input type="email" id="email" class="form-input" placeholder="you@example.com" required autocomplete="email" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Password</label>
+              <div class="input-wrapper has-toggle">
+                <img src="assets/icons/lock.svg" class="input-icon" alt="" />
+                <input type="password" id="password" class="form-input" placeholder="At least 8 characters" required autocomplete="new-password" data-pw-toggle />
+                <button type="button" class="input-toggle" tabindex="-1">
+                  <svg class="icon-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confirm Password</label>
+              <div class="input-wrapper has-toggle">
+                <img src="assets/icons/lock.svg" class="input-icon" alt="" />
+                <input type="password" id="confirmPassword" class="form-input" placeholder="Repeat your password" required autocomplete="new-password" data-pw-toggle />
+                <button type="button" class="input-toggle" tabindex="-1">
+                  <svg class="icon-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-status" id="formStatus"></div>
+            <button type="submit" class="btn-auth" id="registerBtn">Create Account</button>
+          </form>
+
+          <p class="auth-switch">
+            Already have an account? <a href="login" class="auth-switch-link">Sign in</a>
+          </p>
+        </div>
+
+        <div id="stepVerify" style="display:none;">
+          <div class="auth-header" style="margin-bottom:24px;">
+            <h1 class="auth-title">Check your email</h1>
+            <p class="auth-subtitle" id="otpDesc">We sent a 6-digit code to your email.</p>
+          </div>
+          <div class="auth-form">
+            <div class="form-group">
+              <label class="form-label">Verification Code</label>
+              <input type="text" id="otpCode" class="form-input otp-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+            </div>
+            <div class="form-status" id="otpStatus"></div>
+            <button class="btn-auth" id="verifyBtn">Verify Email</button>
+          </div>
+          <p class="auth-switch" style="margin-top:20px;">
+            Didn't get a code? <a href="register" class="auth-switch-link">Try again</a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-brand-side">
+      <div id="auth-particles" class="particles-interactive"></div>
+      <div class="brand-content">
+        <a href="index" class="auth-logo">
+          <img src="assets/logo.png" alt="SynapseCloud" class="logo-img" />
+          <span class="logo-text">Synapse<span class="logo-accent">Cloud</span></span>
+        </a>
+        <div class="brand-body">
+          <h2 class="brand-title">Join thousands of<br>smarter teams.</h2>
+          <p class="brand-desc">Start organizing your files with AI in minutes. No credit card required.</p>
+          <div class="brand-perks">
+            <div class="brand-perk"><span class="perk-dot"></span>Free to get started</div>
+            <div class="brand-perk"><span class="perk-dot"></span>AI-powered file organization</div>
+            <div class="brand-perk"><span class="perk-dot"></span>End-to-end encryption</div>
+            <div class="brand-perk"><span class="perk-dot"></span>Cancel anytime</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="vendor/tsparticles.min.js"></script>
+  <script src="js/shared/particles.js"></script>
+  <script src="js/utils/image.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/public/auth-common.js"></script>
+  <script src="js/fetch/public/auth-fetch.js"></script>
+  <script src="js/public/register.js"></script>
+</body>
+</html>

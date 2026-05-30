@@ -4,6 +4,7 @@ import {
   Column,
   ManyToOne,
   CreateDateColumn,
+  Index,
 } from 'typeorm';
 import { Workspace } from './workspace-entity';
 
@@ -29,6 +30,7 @@ export class File {
   @Column('bigint')
   size: number;
 
+  @Index()
   @Column({ type: 'jsonb', nullable: true })
   tags: string[];
 

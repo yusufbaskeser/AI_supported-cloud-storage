@@ -1,0 +1,109 @@
+.features-main { padding: 72px 24px; }
+
+.feature-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+  padding: 56px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.feature-row:last-child { border-bottom: none; }
+
+.feature-row-reverse .feature-row-visual { order: -1; }
+
+.feature-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.feature-row-title {
+  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.feature-row-title .accent { color: var(--accent); }
+
+.feature-row-desc {
+  font-size: 0.95rem;
+  color: var(--text-sub);
+  line-height: 1.7;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+
+.feature-list li {
+  font-size: 0.9rem;
+  color: var(--text-sub);
+  padding-left: 16px;
+  position: relative;
+}
+
+.feature-list li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+.feature-row-visual {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  aspect-ratio: 4/3;
+}
+
+.feature-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.features-grid-section {
+  padding: 72px 24px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+
+.feature-card:hover { border-color: var(--accent); }
+
+.feature-card-title { font-size: 0.95rem; font-weight: 600; }
+
+.feature-card-desc { font-size: 0.85rem; color: var(--text-sub); line-height: 1.6; }
+
+@media (max-width: 900px) {
+  .feature-row { grid-template-columns: 1fr; gap: 32px; }
+  .feature-row-reverse .feature-row-visual { order: 0; }
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .features-grid { grid-template-columns: 1fr; }
+}

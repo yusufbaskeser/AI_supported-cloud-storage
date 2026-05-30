@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspaces — SynapseCloud</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/public/index.css" />
+  <link rel="stylesheet" href="css/particles.css" />
+  <link rel="stylesheet" href="css/app/app.css" />
+  <link rel="stylesheet" href="css/app/workspaces.css" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+</head>
+<body class="app-body">
+
+  <div id="navbar-placeholder"></div>
+
+  <section class="ws-hero">
+    <div id="ws-particles" class="particles-interactive"></div>
+    <div class="ws-hero-content">
+      <div class="ws-hero-avatar" id="wsHeroAvatar">?</div>
+      <h1 class="ws-hero-name">Hey, <span class="accent" id="wsUserName">—</span></h1>
+      <div class="ws-ai-row">
+        <div class="ws-ai-dot"></div>
+        <p class="ws-ai-text" id="wsAiText">Analyzing your workspaces…</p>
+      </div>
+    </div>
+  </section>
+
+  <main class="app-main">
+    <div class="app-content">
+
+      <div class="page-header-row">
+        <h2 class="ws-section-title">Active Workspaces</h2>
+        <button class="btn-app-primary" id="createBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Workspace
+        </button>
+      </div>
+
+      <div class="ws-grid" id="workspacesGrid">
+        <div class="ws-card skeleton" style="height:200px;border:none;"></div>
+        <div class="ws-card skeleton" style="height:200px;border:none;"></div>
+        <div class="ws-card skeleton" style="height:200px;border:none;"></div>
+      </div>
+
+      <div class="ws-tagcloud-section" id="wsTagCloudSection" style="display:none;">
+        <div class="page-header-row">
+          <h2 class="ws-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            AI Tag Cloud
+          </h2>
+          <span class="ws-tagcloud-count" id="wsTagCount"></span>
+        </div>
+        <div class="ws-tagcloud" id="wsTagCloud"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="vendor/tsparticles.min.js"></script>
+  <script src="js/shared/particles.js"></script>
+  <script src="js/fetch/app/workspace-fetch.js"></script>
+  <script src="js/fetch/app/file-fetch.js"></script>
+  <script src="js/utils/format.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app/app-common.js"></script>
+  <script src="js/app/workspaces.js"></script>
+</body>
+</html>

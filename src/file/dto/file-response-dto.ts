@@ -1,4 +1,3 @@
-// dto/file-response-dto.ts
 export class FileResponseDto {
   file_id: number;
   filename: string;

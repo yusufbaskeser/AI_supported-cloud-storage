@@ -1,0 +1,110 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edit Profile — SynapseCloud</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/public/index.css" />
+  <link rel="stylesheet" href="css/app/app.css" />
+  <link rel="stylesheet" href="css/app/profile-edit.css" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+</head>
+<body class="app-body">
+
+  <div id="navbar-placeholder"></div>
+
+  <main class="app-main">
+    <div class="app-content pe-content">
+
+      <div class="pe-breadcrumb">
+        <a href="profile" class="pe-back-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Profile
+        </a>
+      </div>
+
+      <div class="pe-header">
+        <h1 class="pe-title">Edit Profile</h1>
+        <p class="pe-subtitle">Update your personal information and account settings.</p>
+      </div>
+
+      
+      <div class="app-card pe-section">
+        <div class="pe-section-header">
+          <div class="pe-section-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          </div>
+          <div>
+            <div class="pe-section-title">Profile Photo</div>
+            <div class="pe-section-desc">Upload a photo to personalize your account.</div>
+          </div>
+        </div>
+        <div class="pe-photo-row">
+          <div class="pe-avatar" id="peAvatar">
+            <img id="peAvatarImg" alt="Avatar" style="display:none;width:100%;height:100%;object-fit:cover;" />
+            <span id="peAvatarInitial">?</span>
+          </div>
+          <div class="pe-photo-actions">
+            <button class="btn-app-primary" id="pePhotoBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Upload Photo
+            </button>
+          </div>
+          <input type="file" id="pePhotoInput" accept="image/*" style="display:none;" />
+        </div>
+      </div>
+
+      
+      <div class="app-card pe-section">
+        <div class="pe-section-header">
+          <div class="pe-section-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div>
+            <div class="pe-section-title">Display Name</div>
+            <div class="pe-section-desc">This is the name shown across SynapseCloud.</div>
+          </div>
+        </div>
+        <div class="pe-form-row">
+          <input type="text" id="nameInput" class="form-input" placeholder="Your display name" />
+          <button class="btn-app-primary" id="saveNameBtn" onclick="saveName()">Save</button>
+        </div>
+        <div class="form-status" id="nameStatus"></div>
+      </div>
+
+      
+      <div class="app-card pe-section">
+        <div class="pe-section-header">
+          <div class="pe-section-icon blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div>
+            <div class="pe-section-title">Change Password</div>
+            <div class="pe-section-desc">Use a strong password with at least 8 characters.</div>
+          </div>
+        </div>
+        <div class="pe-form-col">
+          <input type="password" id="newPasswordInput" class="form-input" placeholder="New password (min. 8 characters)" />
+          <input type="password" id="confirmPasswordInput" class="form-input" placeholder="Confirm new password" />
+          <button class="btn-app-primary" id="savePasswordBtn" onclick="savePassword()" style="align-self:flex-start;">
+            Update Password
+          </button>
+        </div>
+        <div class="form-status" id="passwordStatus"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="js/fetch/app/user-fetch.js"></script>
+  <script src="js/utils/format.js"></script>
+  <script src="js/utils/image.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app/app-common.js"></script>
+  <script src="js/app/profile-edit.js"></script>
+</body>
+</html>

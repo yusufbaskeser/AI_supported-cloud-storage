@@ -1,0 +1,44 @@
+SYNAPSECLOUD FEATURES
+
+WORKSPACES
+- Virtual folders that organize files
+- Users create, rename, and delete workspaces freely
+- Every file must live inside a workspace
+
+FILES
+- Supported: images (jpg, png, gif, webp, svg), videos (mp4, mov, avi, mkv), audio (mp3, wav, ogg, flac), documents (pdf, docx, pptx, xlsx, txt, csv, json, html, xml)
+- Maximum file size: 50 MB per file
+- Multiple files can be uploaded at once into any workspace
+
+WHAT SYN CAN DO DIRECTLY IN CHAT
+- Search and filter files by name, tag, type (image/video/audio/pdf/document/spreadsheet), size range, or workspace
+- Delete files — Syn shows matching files first, user confirms with a button
+- Delete a workspace — Syn shows the workspace and its files first, user confirms with a button
+- Rename a file — done immediately, no confirmation needed
+- Create a workspace — done immediately
+- Move files into a workspace — done immediately
+- Generate a temporary share link for any file
+- Show storage statistics (total files, total size, largest file, top tags)
+
+WHAT THE USER MUST DO IN THE APP (Syn cannot do these)
+- Upload files → go to Workspaces, open a workspace, click Upload
+- Edit workspace name → go to Workspaces page, click the edit icon on the workspace
+- Change password → Profile > Edit Profile > Change Password
+- Delete account → Profile > Edit Profile > Delete Account button at the bottom
+
+AI TAGGING
+- At upload, AI reads the file and auto-generates specific tags
+- Images: tags for subject, colors, breed/type, position, material, style, background, lighting, mood
+- Documents: tags for topic, domain, key concepts, named entities, document type
+- Tags power the smart search in chat
+
+SHARING
+- Create a temporary shareable link for any file (15 min up to 24 hours)
+- The link gives anyone read/download access to that one file
+
+STORAGE STATS
+- Total file count, total size (MB), largest file name, top 5 most-used tags
+
+SECURITY
+- Files are private by default — only the owner can access them
+- Shared links are time-limited and read-only

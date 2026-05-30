@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  MinLength,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateWorkspaceDto {
   @IsString()

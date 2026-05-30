@@ -3,4 +3,5 @@ export class WorkspaceResponseDto {
   name: string;
   description: string;
   created_at: Date;
+  file_count?: number;
 }

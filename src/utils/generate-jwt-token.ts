@@ -1,9 +1,7 @@
-    import * as jwt from 'jsonwebtoken';
+import * as jwt from 'jsonwebtoken';
 
-    const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
-
-    export function generateJwtToken(payload: any): string {
-    return jwt.sign(payload, JWT_SECRET, {
-        expiresIn: '30d',
-    });
-    }
+export function generateJwtToken(payload: object): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET is not configured');
+  return jwt.sign(payload, secret, { expiresIn: '30d' });
+}

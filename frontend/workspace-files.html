@@ -1,0 +1,72 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Files — SynapseCloud</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/public/index.css" />
+  <link rel="stylesheet" href="css/app/app.css" />
+  <link rel="stylesheet" href="css/app/workspace-files.css" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+</head>
+<body class="app-body">
+
+  <div id="navbar-placeholder"></div>
+
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay-inner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p>Drop files to upload</p>
+    </div>
+  </div>
+
+  <main class="app-main">
+    <div class="app-content">
+
+      <div class="wf-breadcrumb">
+        <a href="workspaces" class="wf-back-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Workspaces
+        </a>
+      </div>
+
+      <div class="upload-progress" id="uploadProgress" style="display:none;">
+        <div class="upload-progress-bar" id="uploadProgressFill"></div>
+        <span class="upload-progress-text" id="uploadProgressText">Uploading...</span>
+      </div>
+
+      <div class="wf-toolbar">
+        <h2 class="wf-title">Files</h2>
+        <button class="wf-delete-sel-btn" id="bulkDeleteBtn" onclick="openBulkDelete()" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          <span>Delete</span>
+        </button>
+        <button class="btn-app-primary" id="uploadBtnTop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload
+        </button>
+        <input type="file" id="fileInput" multiple style="display:none;" />
+      </div>
+
+      <div class="wf-drop-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 16 12 12 17 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+        Drag files anywhere to upload
+      </div>
+
+      <div id="filesList"></div>
+
+    </div>
+  </main>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="js/fetch/app/workspace-fetch.js"></script>
+  <script src="js/fetch/app/file-fetch.js"></script>
+  <script src="js/utils/format.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app/app-common.js"></script>
+  <script src="js/app/workspace-file.js"></script>
+</body>
+</html>

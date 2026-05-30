@@ -1,0 +1,170 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — SynapseCloud</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/public/index.css" />
+  <link rel="stylesheet" href="css/particles.css" />
+  <link rel="stylesheet" href="css/app/app.css" />
+  <link rel="stylesheet" href="css/app/dashboard.css" />
+  <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('sc-theme')||'light');</script>
+</head>
+<body class="app-body">
+
+  <div id="navbar-placeholder"></div>
+
+  
+  <section class="dash-hero">
+    <div id="dash-particles" class="particles-interactive"></div>
+    <div class="dash-hero-content">
+      <div class="dash-hero-avatar" id="dashHeroAvatar">?</div>
+      <p class="dash-greeting" id="dashGreeting">Welcome back,</p>
+      <h1 class="dash-hero-title"><span id="welcomeName" class="accent">—</span></h1>
+      <div class="dash-quick-actions">
+        <a href="workspaces" class="btn-app-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Workspace
+        </a>
+        <a href="chat" class="btn-app-ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Ask AI
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="app-content">
+
+    
+    <div class="dash-stats" id="dashStats">
+      <div class="dash-stat-card skeleton" style="height:96px;"></div>
+      <div class="dash-stat-card skeleton" style="height:96px;"></div>
+      <div class="dash-stat-card skeleton" style="height:96px;"></div>
+      <div class="dash-stat-card skeleton" style="height:96px;"></div>
+    </div>
+
+    
+    <div class="dash-section">
+      <div class="page-header-row">
+        <h2 class="dash-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Storage Overview
+        </h2>
+      </div>
+      <div class="dash-storage-grid" id="dashStorageGrid">
+        <div class="app-card skeleton" style="height:280px;"></div>
+        <div class="app-card skeleton" style="height:280px;"></div>
+      </div>
+    </div>
+
+    
+    <div class="dash-section">
+      <div class="page-header-row">
+        <h2 class="dash-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Recent Workspaces
+        </h2>
+        <a href="workspaces" class="btn-app-ghost" style="font-size:0.82rem;padding:6px 14px;">View all</a>
+      </div>
+      <div class="dash-ws-grid" id="recentWorkspaces">
+        <div class="dash-ws-card skeleton" style="height:80px;"></div>
+        <div class="dash-ws-card skeleton" style="height:80px;"></div>
+        <div class="dash-ws-card skeleton" style="height:80px;"></div>
+      </div>
+    </div>
+
+    
+    <div class="dash-section dash-news-section">
+      <div class="page-header-row">
+        <h2 class="dash-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+          What's New
+        </h2>
+        <span class="dash-news-badge">Latest updates</span>
+      </div>
+      <div class="dash-news-grid">
+
+        <div class="dash-news-card">
+          <div class="dash-news-img">
+            <img src="assets/images/dashboardimage1.png" alt="AI Voice Commands" />
+            <div class="dash-news-img-overlay"></div>
+            <span class="dash-news-tag coming-soon">Coming Soon</span>
+          </div>
+          <div class="dash-news-body">
+            <div class="dash-news-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </div>
+            <h3 class="dash-news-title">AI Voice Commands</h3>
+            <p class="dash-news-desc">Control your files hands-free. Speak naturally and let AI handle the rest — upload, search, and organize without lifting a finger.</p>
+          </div>
+        </div>
+
+        <div class="dash-news-card">
+          <div class="dash-news-img">
+            <img src="assets/images/dashboardimage2.png" alt="Smarter AI Search" />
+            <div class="dash-news-img-overlay"></div>
+            <span class="dash-news-tag new">Live Now</span>
+          </div>
+          <div class="dash-news-body">
+            <div class="dash-news-icon green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <h3 class="dash-news-title">Smarter AI Search</h3>
+            <p class="dash-news-desc">Semantic search now understands natural language. Find any file across all your workspaces by describing what you remember about it.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  
+  <section class="dash-cta">
+    <div id="cta-particles" class="particles-interactive"></div>
+    <div class="dash-cta-inner">
+      <div class="dash-cta-text">
+        <p class="dash-cta-eyebrow">Your cloud, your rules</p>
+        <h2 class="dash-cta-title">What are you<br>waiting for?</h2>
+        <p class="dash-cta-sub">Store, organize, and access everything with the power of AI. Your files are safer and smarter than ever.</p>
+        <div class="dash-cta-actions">
+          <a href="workspaces" class="btn-app-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            Open Workspaces
+          </a>
+          <a href="chat" class="btn-app-ghost dash-cta-ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Ask AI
+          </a>
+        </div>
+      </div>
+      <div class="dash-cta-character">
+        <lottie-player
+          src="assets/animations/DancingRobot.json"
+          background="transparent"
+          speed="1"
+          loop
+          autoplay
+          style="width:420px;height:420px;">
+        </lottie-player>
+      </div>
+    </div>
+  </section>
+
+  <div id="footer-placeholder"></div>
+
+  <script src="vendor/lottie-player.js"></script>
+  <script src="vendor/tsparticles.min.js"></script>
+  <script src="js/shared/particles.js"></script>
+  <script src="js/utils/format.js"></script>
+  <script src="js/utils/image.js"></script>
+  <script src="js/fetch/app/workspace-fetch.js"></script>
+  <script src="js/fetch/app/user-fetch.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app/app-common.js"></script>
+  <script src="js/app/dashboard.js"></script>
+</body>
+</html>
