@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  ParseIntPipe,
   Query,
   Request,
   UseInterceptors,
@@ -33,7 +34,7 @@ export class FileController {
     limits: { fileSize: 50 * 1024 * 1024 },
   }))
   async uploadFiles(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @UploadedFiles() files: Express.Multer.File[],
     @Request() req,
   ) {
@@ -45,7 +46,7 @@ export class FileController {
 
   @Get('workspaces/:workspace_id/files')
   async getFiles(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
     @Request() req,
@@ -55,7 +56,7 @@ export class FileController {
 
   @Get(':file_id/url')
   async getFileUrl(
-    @Param('file_id') file_id: number,
+    @Param('file_id', ParseIntPipe) file_id: number,
     @Request() req,
   ) {
     const url = await this.fileService.getFileUrl(file_id, req.user.user_id);
@@ -64,7 +65,7 @@ export class FileController {
 
   @Get(':file_id/download')
   async getFileDownloadUrl(
-    @Param('file_id') file_id: number,
+    @Param('file_id', ParseIntPipe) file_id: number,
     @Request() req,
   ) {
     const url = await this.fileService.getFileDownloadUrl(file_id, req.user.user_id);
@@ -73,7 +74,7 @@ export class FileController {
 
   @Get(':file_id/share')
   async generateShareUrl(
-    @Param('file_id') file_id: number,
+    @Param('file_id', ParseIntPipe) file_id: number,
     @Query('expiry') expiry: string,
     @Request() req,
   ) {
@@ -82,7 +83,7 @@ export class FileController {
 
   @Put(':file_id')
   async updateFilename(
-    @Param('file_id') file_id: number,
+    @Param('file_id', ParseIntPipe) file_id: number,
     @Body() updateDto: UpdateFilenameRequestDto,
     @Request() req,
   ): Promise<FileResponseDto> {

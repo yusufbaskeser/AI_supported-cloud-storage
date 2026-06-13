@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, MoreThan } from 'typeorm';
-import * as Minio from 'minio';
+import type { Client as MinioClient } from 'minio';
+import { createMinioClient } from '../utils/minio-client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { User, UserRole } from '../entities/user-entity';
 import { File } from '../entities/file-entity';
 import { Workspace } from '../entities/workspace-entity';
@@ -9,7 +12,7 @@ import { Chat } from '../entities/chat-entity';
 
 @Injectable()
 export class AdminService {
-  private minioClient: Minio.Client;
+  private minioClient: MinioClient;
   private bucketName: string;
 
   constructor(
@@ -17,15 +20,9 @@ export class AdminService {
     @InjectRepository(File) private fileRepo: Repository<File>,
     @InjectRepository(Workspace) private workspaceRepo: Repository<Workspace>,
     @InjectRepository(Chat) private chatRepo: Repository<Chat>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
-    this.minioClient = new Minio.Client({
-      endPoint: process.env.MINIO_ENDPOINT!.replace('https://', ''),
-      port: 443,
-      useSSL: true,
-      accessKey: process.env.MINIO_ACCESS_KEY!,
-      secretKey: process.env.MINIO_SECRET_KEY!,
-      region: 'auto',
-    });
+    this.minioClient = createMinioClient();
     this.bucketName = process.env.MINIO_BUCKET!;
   }
 
@@ -201,6 +198,18 @@ export class AdminService {
   async deleteUser(id: number) {
     const user = await this.userRepo.findOne({ where: { user_id: id } });
     if (!user) throw new NotFoundException('User not found');
+
+    const files = await this.fileRepo
+      .createQueryBuilder('f')
+      .innerJoin('f.workspace', 'w')
+      .innerJoin('w.user', 'u')
+      .where('u.user_id = :id', { id })
+      .getMany();
+
+    if (files.length > 0) {
+      await this.minioClient.removeObjects(this.bucketName, files.map(f => f.minio_path));
+    }
+
     await this.userRepo.delete(id);
     return { message: 'User deleted' };
   }
@@ -237,11 +246,32 @@ export class AdminService {
   async forceDeleteWorkspace(id: number) {
     const workspace = await this.workspaceRepo.findOne({
       where: { workspace_id: id },
-      relations: ['files'],
+      relations: ['files', 'user'],
     });
     if (!workspace) throw new NotFoundException('Workspace not found');
-    await this.deleteFilesFromStorage(workspace.files ?? []);
+
+    const files = workspace.files ?? [];
+    const totalSize = files.reduce((s, f) => s + Number(f.size), 0);
+    await this.deleteFilesFromStorage(files);
     await this.workspaceRepo.delete(id);
+
+    if (workspace.user && totalSize > 0) {
+      const owner = await this.userRepo.findOne({ where: { user_id: workspace.user.user_id } });
+      if (owner) {
+        await this.userRepo.update(owner.user_id, {
+          usedStorage: Math.max(0, Number(owner.usedStorage) - totalSize),
+        });
+      }
+    }
+
+    try {
+      if (workspace.user) {
+        const uid = workspace.user.user_id;
+        await this.cacheManager.del(`cache_user_${uid}_url_/v1/workspaces`);
+        await this.cacheManager.del(`cache_user_${uid}_url_/v1/files/workspaces/${id}/files`);
+      }
+    } catch {}
+
     return { message: 'Workspace deleted' };
   }
 
@@ -272,9 +302,32 @@ export class AdminService {
   }
 
   async forceDeleteFile(id: number) {
-    const file = await this.fileRepo.findOne({ where: { file_id: id } });
+    const file = await this.fileRepo.findOne({
+      where: { file_id: id },
+      relations: ['workspace', 'workspace.user'],
+    });
     if (!file) throw new NotFoundException('File not found');
+    const fileSize = Number(file.size);
+    const ownerId = file.workspace?.user?.user_id;
+    const workspaceId = file.workspace?.workspace_id;
+
     await this.deleteFilesFromStorage([file]);
+
+    if (ownerId) {
+      const owner = await this.userRepo.findOne({ where: { user_id: ownerId } });
+      if (owner) {
+        await this.userRepo.update(ownerId, {
+          usedStorage: Math.max(0, Number(owner.usedStorage) - fileSize),
+        });
+      }
+      try {
+        await this.cacheManager.del(`cache_user_${ownerId}_file_url_${id}`);
+        if (workspaceId) {
+          await this.cacheManager.del(`cache_user_${ownerId}_url_/v1/files/workspaces/${workspaceId}/files`);
+        }
+      } catch {}
+    }
+
     return { message: 'File deleted' };
   }
 

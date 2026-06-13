@@ -57,11 +57,21 @@ export class WorkspaceService {
     };
   }
 
+  private async delCache(key: string): Promise<void> {
+    try { await this.cacheManager.del(key); } catch {}
+  }
+
   async createWorkspace(createDto: CreateWorkspaceDto, user_id: number): Promise<WorkspaceResponseDto> {
     const workspace = this.workspaceRepository.create({ ...createDto, user: { user_id } });
     const saved = await this.workspaceRepository.save(workspace);
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/workspaces`);
-    return saved;
+    this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
+    return {
+      workspace_id: saved.workspace_id,
+      name: saved.name,
+      description: saved.description,
+      created_at: saved.created_at,
+      file_count: 0,
+    };
   }
 
   async updateWorkspace(workspace_id: number, updateDto: UpdateWorkspaceDto, user_id: number): Promise<WorkspaceResponseDto> {
@@ -70,17 +80,23 @@ export class WorkspaceService {
     validateWorkspaceOwnership(workspace!, user_id);
     Object.assign(workspace!, updateDto);
     const updated = await this.workspaceRepository.save(workspace!);
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/workspaces`);
-    return updated;
+    this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
+    return {
+      workspace_id: updated.workspace_id,
+      name: updated.name,
+      description: updated.description,
+      created_at: updated.created_at,
+    };
   }
 
   async deleteWorkspace(workspace_id: number, user_id: number): Promise<DeleteWorkspaceResponseDto> {
     const workspace = await this.workspaceRepository.findOne({ where: { workspace_id }, relations: ['user'] });
     validateWorkspaceExists(workspace);
     validateWorkspaceOwnership(workspace!, user_id);
-    await this.fileService.deleteAllByWorkspace(workspace_id, user_id);
+    const files = await this.fileService.loadWorkspaceFiles(workspace_id);
     await this.workspaceRepository.delete({ workspace_id });
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/workspaces`);
+    this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
+    this.fileService.runMinioCleanup(files, user_id, workspace_id).catch(() => {});
     return { message: 'Workspace successfully deleted' };
   }
 }

@@ -6,16 +6,14 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../../entities/user-entity';
 import { Repository } from 'typeorm';
 import * as jwt from 'jsonwebtoken';
+import { TestHelper } from '../../test-utils/test-helper';
 
 describe('Auth End-to-End Tests', () => {
   let app: INestApplication;
-  let userRepository: Repository<User>;
+  let userRepo: Repository<User>;
+  let unverifiedUserData: ReturnType<typeof TestHelper.generateUserData>;
 
-  const testUser = {
-    name: `user_${Date.now()}`,
-    email: `test_${Date.now()}@synapse.com`,
-    password: 'Password123!',
-  };
+  const testUser = TestHelper.generateUserData('user');
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -25,7 +23,7 @@ describe('Auth End-to-End Tests', () => {
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    userRepository = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
+    userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
   }, 30000);
 
@@ -72,14 +70,14 @@ describe('Auth End-to-End Tests', () => {
     it('should fail with short password', async () => {
       await request(app.getHttpServer())
         .post('/v1/auth/register')
-        .send({ ...testUser, email: `new_${Date.now()}@synapse.com`, password: '123' })
+        .send({ ...testUser, email: TestHelper.generateUserData('short').email, password: '123' })
         .expect(400);
     });
   });
 
   describe('POST /v1/auth/verify', () => {
     it('should verify account with correct OTP code', async () => {
-      const user = await userRepository.findOne({ where: { email: testUser.email } });
+      const user = await userRepo.findOne({ where: { email: testUser.email } });
 
       const res = await request(app.getHttpServer())
         .post('/v1/auth/verify')
@@ -110,6 +108,13 @@ describe('Auth End-to-End Tests', () => {
         .post('/v1/auth/verify')
         .send({})
         .expect(400);
+    });
+
+    it('should fail when account is already verified', async () => {
+      await request(app.getHttpServer())
+        .post('/v1/auth/verify')
+        .send({ email: testUser.email, code: '123456' })
+        .expect(401);
     });
   });
 
@@ -150,6 +155,18 @@ describe('Auth End-to-End Tests', () => {
         .send({})
         .expect(400);
     });
+
+    it('should fail login for unverified account', async () => {
+      unverifiedUserData = TestHelper.generateUserData('unverified');
+      await request(app.getHttpServer()).post('/v1/auth/register').send(unverifiedUserData);
+
+      const res = await request(app.getHttpServer())
+        .post('/v1/auth/login')
+        .send({ name: unverifiedUserData.name, password: unverifiedUserData.password })
+        .expect(401);
+
+      expect(res.body.message).toBe('Account not verified. Please check your email for the verification code.');
+    });
   });
 
   describe('POST /v1/auth/forgot-password', () => {
@@ -171,21 +188,21 @@ describe('Auth End-to-End Tests', () => {
       expect(res.body.message).toBe('No user found with that email.');
     });
 
-
-
-
+    it('should fail with empty body', async () => {
+      await request(app.getHttpServer())
+        .post('/v1/auth/forgot-password')
+        .send({})
+        .expect(400);
+    });
   });
 
   describe('POST /v1/auth/reset-password', () => {
     it('should reset password with a valid token', async () => {
-      const user = await userRepository.findOne({ where: { email: testUser.email } });
+      const user = await userRepo.findOne({ where: { email: testUser.email } });
 
       const res = await request(app.getHttpServer())
         .post('/v1/auth/reset-password')
-        .send({
-          token: user!.resetPasswordToken,
-          newPassword: 'NewSecurePassword999!',
-        })
+        .send({ token: user!.resetPasswordToken, newPassword: 'NewSecurePassword999!' })
         .expect(201);
 
       expect(res.body.message).toBe('Password updated successfully.');
@@ -194,26 +211,18 @@ describe('Auth End-to-End Tests', () => {
     it('should fail with an invalid or expired token', async () => {
       const res = await request(app.getHttpServer())
         .post('/v1/auth/reset-password')
-        .send({
-          token: 'invalid-token-string',
-          newPassword: 'SomePassword123',
-        })
+        .send({ token: 'invalid-token-string', newPassword: 'SomePassword123' })
         .expect(400);
 
       expect(res.body.message).toBe('Expired or invalid token.');
     });
 
-
-
     it('should fail with short new password', async () => {
-      const user = await userRepository.findOne({ where: { email: testUser.email } });
+      const user = await userRepo.findOne({ where: { email: testUser.email } });
 
       await request(app.getHttpServer())
         .post('/v1/auth/reset-password')
-        .send({
-          token: user!.resetPasswordToken,
-          newPassword: '123',
-        })
+        .send({ token: user!.resetPasswordToken, newPassword: '123' })
         .expect(400);
     });
 
@@ -223,9 +232,30 @@ describe('Auth End-to-End Tests', () => {
         .send({})
         .expect(400);
     });
+
+    it('should fail when using the same reset token twice', async () => {
+      await request(app.getHttpServer())
+        .post('/v1/auth/forgot-password')
+        .send({ email: testUser.email });
+
+      const user = await userRepo.findOne({ where: { email: testUser.email } });
+      const token = user!.resetPasswordToken;
+
+      await request(app.getHttpServer())
+        .post('/v1/auth/reset-password')
+        .send({ token, newPassword: 'AnotherPassword123!' })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/v1/auth/reset-password')
+        .send({ token, newPassword: 'YetAnotherPassword123!' })
+        .expect(400);
+    });
   });
 
   afterAll(async () => {
+    await TestHelper.cleanupUser(userRepo, testUser.email);
+    if (unverifiedUserData) await TestHelper.cleanupUser(userRepo, unverifiedUserData.email);
     await app.close();
   });
 });

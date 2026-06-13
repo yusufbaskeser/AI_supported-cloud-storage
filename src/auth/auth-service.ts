@@ -5,6 +5,7 @@ import * as crypto from 'crypto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { User } from '../entities/user-entity';
+import { File } from '../entities/file-entity';
 import { RegisterRequestDto } from './dto/registerDto/registerRequestDto';
 import { LoginRequestDto } from './dto/loginDto/loginRequestDto';
 import { LoginResponseDto } from './dto/loginDto/loginResponseDto';
@@ -14,20 +15,47 @@ import { comparePassword } from '../utils/compare-password';
 import { generateJwtToken } from '../utils/generate-jwt-token';
 import { validateRegister, validateLogin } from './auth-validations/auth-validations';
 import { sendResetPasswordLink, sendVerificationCode } from '../utils/send-mail';
+import type { Client as MinioClient } from 'minio';
+import { createMinioClient } from '../utils/minio-client';
 
 @Injectable()
 export class AuthService {
+  private readonly minioClient: MinioClient;
+  private readonly bucketName: string;
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-  ) {}
+    @InjectRepository(File)
+    private readonly fileRepository: Repository<File>,
+  ) {
+    this.minioClient = createMinioClient();
+    this.bucketName = process.env.MINIO_BUCKET!;
+  }
 
   @Cron(CronExpression.EVERY_MINUTE)
   async handleExpiredUsersCleanup() {
-    await this.userRepository.delete({
-      is_verified: false,
-      verification_code_expires: LessThan(new Date()),
+    const expiredUsers = await this.userRepository.find({
+      where: { is_verified: false, verification_code_expires: LessThan(new Date()) },
+      select: ['user_id'],
     });
+
+    if (expiredUsers.length === 0) return;
+
+    const userIds = expiredUsers.map(u => u.user_id);
+
+    const files = await this.fileRepository
+      .createQueryBuilder('f')
+      .innerJoin('f.workspace', 'w')
+      .innerJoin('w.user', 'u')
+      .where('u.user_id IN (:...userIds)', { userIds })
+      .getMany();
+
+    if (files.length > 0) {
+      await this.minioClient.removeObjects(this.bucketName, files.map(f => f.minio_path)).catch(() => {});
+    }
+
+    await this.userRepository.delete(userIds);
   }
 
   async register(dto: RegisterRequestDto): Promise<{ message: string }> {

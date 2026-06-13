@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from 'src/app.module';
 import { JwtAuthGuard } from 'src/guard/jwt-auth-guard';
@@ -9,6 +9,7 @@ jest.setTimeout(120000);
 
 describe('Chat Controller (Integration)', () => {
   let app: INestApplication;
+  let secureApp: INestApplication;
   let chatService: ChatService;
 
   const mockUser = { user_id: 1, name: 'John Doe', email: 'john@example.com' };
@@ -18,6 +19,11 @@ describe('Chat Controller (Integration)', () => {
   ];
 
   beforeAll(async () => {
+    const secureFixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    secureApp = secureFixture.createNestApplication();
+    secureApp.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    await secureApp.init();
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -32,6 +38,7 @@ describe('Chat Controller (Integration)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
 
     try {
@@ -52,11 +59,36 @@ describe('Chat Controller (Integration)', () => {
       .send({ message: msg });
   };
 
+  describe('Security Check', () => {
+    it('should return 401 when no token is provided', async () => {
+      await request(secureApp.getHttpServer())
+        .post('/chat/message')
+        .send({ message: 'hello' })
+        .expect(401);
+    });
+  });
+
   describe('POST /chat/message', () => {
+    it('should return 400 when message is empty', async () => {
+      await request(app.getHttpServer())
+        .post('/chat/message')
+        .set('Authorization', 'Bearer fake-token')
+        .send({ message: '' })
+        .expect(400);
+    });
+
+    it('should return 400 when message field is missing', async () => {
+      await request(app.getHttpServer())
+        .post('/chat/message')
+        .set('Authorization', 'Bearer fake-token')
+        .send({})
+        .expect(400);
+    });
+
     it('should return a general AI response for a basic message', async () => {
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'Hello!',
-        action: 'general'
+        action: 'general',
       });
 
       const res = await sendChatMessage('Hello, how are you?');
@@ -68,7 +100,7 @@ describe('Chat Controller (Integration)', () => {
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'Found files',
         action: 'search_files',
-        files: [mockFiles[0]]
+        files: [mockFiles[0]],
       });
 
       const res = await sendChatMessage('Find my nature photos');
@@ -81,11 +113,10 @@ describe('Chat Controller (Integration)', () => {
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'You have 2 files.',
         action: 'stats',
-        stats: { total_files: 2, total_size_mb: '2.50' }
+        stats: { total_files: 2, total_size_mb: '2.50' },
       });
 
       const res = await sendChatMessage('How many files do I have?');
-
       expect(res.status).toBe(201);
       expect(res.body.action).toBe('stats');
       expect(res.body.stats.total_files).toBe(2);
@@ -94,7 +125,7 @@ describe('Chat Controller (Integration)', () => {
     it('should create a new workspace when requested', async () => {
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'Workspace "Work" created.',
-        action: 'general'
+        action: 'general',
       });
 
       const res = await sendChatMessage('Create a workspace named "Work"');
@@ -108,18 +139,57 @@ describe('Chat Controller (Integration)', () => {
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'Found large files',
         action: 'search_files',
-        files: [largeFile]
+        files: [largeFile],
       });
 
       const res = await sendChatMessage('Find my large files');
-
       expect(res.status).toBe(201);
       expect(res.body.action).toBe('search_files');
       expect(res.body.files[0].size).toBeGreaterThan(50 * 1024 * 1024);
     });
+
+    it('should return next result when user asks for another file', async () => {
+      jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
+        reply: 'Here is another file.',
+        action: 'search_files',
+        files: [mockFiles[1]],
+      });
+
+      const res = await sendChatMessage('Show me another one');
+      expect(res.status).toBe(201);
+      expect(res.body.action).toBe('search_files');
+      expect(res.body.files.length).toBeGreaterThan(0);
+    });
+
+    it('should return files marked for deletion with confirmation action', async () => {
+      jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
+        reply: 'The following files will be deleted. Please confirm.',
+        action: 'delete_files',
+        files: [mockFiles[0]],
+      });
+
+      const res = await sendChatMessage('Delete my nature photos');
+      expect(res.status).toBe(201);
+      expect(res.body.action).toBe('delete_files');
+      expect(res.body.files.length).toBeGreaterThan(0);
+    });
+
+    it('should return a file for link generation', async () => {
+      jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
+        reply: 'Generating a shareable link for your file.',
+        action: 'generate_link',
+        files: [{ file_id: mockFiles[0].file_id, filename: mockFiles[0].filename }],
+      });
+
+      const res = await sendChatMessage('Generate a link for my landscape photo');
+      expect(res.status).toBe(201);
+      expect(res.body.action).toBe('generate_link');
+      expect(res.body.files.length).toBeGreaterThan(0);
+    });
   });
 
   afterAll(async () => {
+    if (secureApp) await secureApp.close();
     if (app) await app.close();
   });
 });

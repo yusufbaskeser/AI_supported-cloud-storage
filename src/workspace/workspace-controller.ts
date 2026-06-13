@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  ParseIntPipe,
   UseGuards,
   UseInterceptors,
   Request,
@@ -31,7 +32,7 @@ export class WorkspaceController {
 
   @Get(':workspace_id')
   async getWorkspaceById(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @Request() req,
   ): Promise<WorkspaceResponseDto> {
     return this.workspaceService.findWorkspaceById(workspace_id, req.user.user_id);
@@ -47,7 +48,7 @@ export class WorkspaceController {
 
   @Put(':workspace_id')
   async updateWorkspace(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @Body() updateDto: UpdateWorkspaceDto,
     @Request() req,
   ): Promise<WorkspaceResponseDto> {
@@ -56,7 +57,7 @@ export class WorkspaceController {
 
   @Delete(':workspace_id')
   async deleteWorkspace(
-    @Param('workspace_id') workspace_id: number,
+    @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @Request() req,
   ): Promise<DeleteWorkspaceResponseDto> {
     return this.workspaceService.deleteWorkspace(workspace_id, req.user.user_id);

@@ -5,13 +5,17 @@ import { AppModule } from '../../app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../../entities/user-entity';
 import { Repository } from 'typeorm';
+import { TestHelper } from '../../test-utils/test-helper';
 
 describe('Workspace Management End-to-End Tests', () => {
   let app: INestApplication;
-  let userRepository: Repository<User>;
+  let userRepo: Repository<User>;
   let user1Token: string;
   let user2Token: string;
   let user1WorkspaceId: number;
+
+  const u1 = TestHelper.generateUserData('owner');
+  const u2 = TestHelper.generateUserData('other');
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -21,22 +25,14 @@ describe('Workspace Management End-to-End Tests', () => {
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    userRepository = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
+    userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
 
-    const u1 = { name: 'OwnerUser', email: `u1_${Date.now()}@synapse.com`, password: 'Password123!' };
-    await request(app.getHttpServer()).post('/v1/auth/register').send(u1);
-    const dbU1 = await userRepository.findOne({ where: { email: u1.email } });
-    await request(app.getHttpServer()).post('/v1/auth/verify').send({ email: u1.email, code: dbU1!.verification_code });
-    const login1 = await request(app.getHttpServer()).post('/v1/auth/login').send({ name: u1.name, password: u1.password });
-    user1Token = login1.body.token;
+    const result1 = await TestHelper.createUser(app, userRepo, u1);
+    user1Token = result1.token;
 
-    const u2 = { name: 'OtherUser', email: `u2_${Date.now()}@synapse.com`, password: 'Password123!' };
-    await request(app.getHttpServer()).post('/v1/auth/register').send(u2);
-    const dbU2 = await userRepository.findOne({ where: { email: u2.email } });
-    await request(app.getHttpServer()).post('/v1/auth/verify').send({ email: u2.email, code: dbU2!.verification_code });
-    const login2 = await request(app.getHttpServer()).post('/v1/auth/login').send({ name: u2.name, password: u2.password });
-    user2Token = login2.body.token;
+    const result2 = await TestHelper.createUser(app, userRepo, u2);
+    user2Token = result2.token;
   }, 40000);
 
   describe('Security Check', () => {
@@ -53,11 +49,11 @@ describe('Workspace Management End-to-End Tests', () => {
       const res = await request(app.getHttpServer())
         .post('/v1/workspaces')
         .set('Authorization', `Bearer ${user1Token}`)
-        .send({ name: 'Yusuf Workspace', description: 'Testing workspace ownership' })
+        .send({ name: 'Test Workspace', description: 'Testing workspace ownership' })
         .expect(201);
 
       user1WorkspaceId = res.body.workspace_id;
-      expect(res.body.name).toBe('Yusuf Workspace');
+      expect(res.body.name).toBe('Test Workspace');
     });
 
     it('should return 400 with empty body', () => {
@@ -82,6 +78,33 @@ describe('Workspace Management End-to-End Tests', () => {
         .set('Authorization', `Bearer ${user1Token}`)
         .send({ name: 'Yo' })
         .expect(400);
+    });
+  });
+
+  describe('GET /v1/workspaces', () => {
+    it('should return 401 when no token is provided', () => {
+      return request(app.getHttpServer())
+        .get('/v1/workspaces')
+        .expect(401);
+    });
+
+    it('should return list of workspaces for authenticated user', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/v1/workspaces')
+        .set('Authorization', `Bearer ${user1Token}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThan(0);
+    });
+
+    it('should return empty array when user has no workspaces', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/v1/workspaces')
+        .set('Authorization', `Bearer ${user2Token}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
     });
   });
 
@@ -121,7 +144,13 @@ describe('Workspace Management End-to-End Tests', () => {
       expect(res.body.name).toBe('Updated Workspace Name');
     });
 
-
+    it('should return 400 when name is too short', () => {
+      return request(app.getHttpServer())
+        .put(`/v1/workspaces/${user1WorkspaceId}`)
+        .set('Authorization', `Bearer ${user1Token}`)
+        .send({ name: 'Yo' })
+        .expect(400);
+    });
 
     it('should return 403 when other user updates workspace', () => {
       return request(app.getHttpServer())
@@ -173,6 +202,8 @@ describe('Workspace Management End-to-End Tests', () => {
   });
 
   afterAll(async () => {
+    await TestHelper.cleanupUser(userRepo, u1.email);
+    await TestHelper.cleanupUser(userRepo, u2.email);
     await app.close();
   });
 });

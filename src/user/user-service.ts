@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import * as Minio from 'minio';
+import type { Client as MinioClient } from 'minio';
 
 import { User } from '../entities/user-entity';
 import { File } from '../entities/file-entity';
@@ -13,10 +13,11 @@ import { UserUpdateResponseDto } from './dto/userUpdateResponseDto';
 import { UserDeleteResponseDto } from './dto/userDeleteResponseDto';
 import { validateUserExists } from './user-validations/user-validations';
 import { hashPassword } from 'src/utils/hash-password';
+import { createMinioClient } from 'src/utils/minio-client';
 
 @Injectable()
 export class UserService {
-  private readonly minioClient: Minio.Client;
+  private readonly minioClient: MinioClient;
   private readonly bucketName: string;
 
   constructor(
@@ -26,14 +27,7 @@ export class UserService {
     private readonly fileRepository: Repository<File>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {
-    this.minioClient = new Minio.Client({
-      endPoint: process.env.MINIO_ENDPOINT!.replace('https://', ''),
-      port: 443,
-      useSSL: true,
-      accessKey: process.env.MINIO_ACCESS_KEY!,
-      secretKey: process.env.MINIO_SECRET_KEY!,
-      region: 'auto',
-    });
+    this.minioClient = createMinioClient();
     this.bucketName = process.env.MINIO_BUCKET!;
   }
 

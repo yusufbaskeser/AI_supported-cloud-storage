@@ -4,7 +4,7 @@ import { Repository, In } from 'typeorm';
 import { File } from '../entities/file-entity';
 import { Workspace } from '../entities/workspace-entity';
 import { User } from '../entities/user-entity';
-import * as Minio from 'minio';
+import type { Client as MinioClient } from 'minio';
 import { FileResponseDto } from './dto/file-response-dto';
 import { DeleteFileResponseDto } from './dto/delete-file-response-dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -16,6 +16,7 @@ import {
   validateFileOwnership
 } from './file-validations/file-validations';
 import { AITagGenerator } from 'src/utils/ai-tag-generator';
+import { createMinioClient } from 'src/utils/minio-client';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
@@ -35,7 +36,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 @Injectable()
 export class FileService {
-  private minioClient: Minio.Client;
+  private minioClient: MinioClient;
   private bucketName: string;
 
   constructor(
@@ -44,16 +45,21 @@ export class FileService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
-    this.minioClient = new Minio.Client({
-      endPoint: process.env.MINIO_ENDPOINT!.replace('https://', ''),
-      port: 443,
-      useSSL: true,
-      accessKey: process.env.MINIO_ACCESS_KEY!,
-      secretKey: process.env.MINIO_SECRET_KEY!,
-      region: 'auto',
-    });
+    this.minioClient = createMinioClient();
     this.bucketName = process.env.MINIO_BUCKET!;
     AITagGenerator.initialize(process.env.GEMINI_API_KEY!);
+  }
+
+  private async delCache(key: string): Promise<void> {
+    try { await this.cacheManager.del(key); } catch {}
+  }
+
+  private async getCache<T>(key: string): Promise<T | undefined> {
+    try { return await this.cacheManager.get<T>(key) ?? undefined; } catch { return undefined; }
+  }
+
+  private async setCache(key: string, value: unknown, ttl: number): Promise<void> {
+    try { await this.cacheManager.set(key, value, ttl); } catch {}
   }
 
   private validateFile(file: Express.Multer.File): void {
@@ -151,18 +157,21 @@ export class FileService {
         }
       })
     );
-
-    const cacheKey = `cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`;
-    await this.cacheManager.del(cacheKey);
-
     const successfulFiles = uploadedFiles.filter((f) => f !== null) as File[];
     if (successfulFiles.length > 0) {
       const uploadedSize = successfulFiles.reduce((sum, f) => sum + Number(f.size), 0);
       await this.userRepo.increment({ user_id }, 'usedStorage', uploadedSize);
     }
-
+    await Promise.all([
+      this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`),
+      this.delCache(`cache_user_${user_id}_url_/v1/workspaces`),
+    ]);
     return successfulFiles as FileResponseDto[];
   }
+
+
+
+
 
   private async generateAndSaveTags(fileId: number, file: Express.Multer.File) {
     try {
@@ -195,7 +204,7 @@ export class FileService {
 
   async getFileUrl(file_id: number, user_id: number): Promise<string> {
     const cacheKey = `cache_user_${user_id}_file_url_${file_id}`;
-    const cached = await this.cacheManager.get<string>(cacheKey);
+    const cached = await this.getCache<string>(cacheKey);
     if (cached) return cached;
 
     const file = await this.fileRepo.findOne({
@@ -207,7 +216,7 @@ export class FileService {
     validateFileOwnership(file!, user_id);
 
     const url = await this.minioClient.presignedUrl('GET', this.bucketName, file!.minio_path, 3600);
-    await this.cacheManager.set(cacheKey, url, 3_300_000);
+    await this.setCache(cacheKey, url, 3_300_000);
 
     return url;
   }
@@ -262,8 +271,8 @@ export class FileService {
     file!.filename = filename;
     const updatedFile = await this.fileRepo.save(file!);
 
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/files/workspaces/${file!.workspace.workspace_id}/files`);
-    await this.cacheManager.del(`cache_user_${user_id}_file_url_${file_id}`);
+    await this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${file!.workspace.workspace_id}/files`);
+    await this.delCache(`cache_user_${user_id}_file_url_${file_id}`);
 
     return updatedFile;
   }
@@ -299,8 +308,11 @@ export class FileService {
         });
       }
 
-      await this.cacheManager.del(`cache_user_${user_id}_url_/v1/files/workspaces/${workspaceId}/files`);
-      await Promise.all(files.map(f => this.cacheManager.del(`cache_user_${user_id}_file_url_${f.file_id}`)));
+      await Promise.all([
+        this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${workspaceId}/files`),
+        this.delCache(`cache_user_${user_id}_url_/v1/workspaces`),
+        ...files.map(f => this.delCache(`cache_user_${user_id}_file_url_${f.file_id}`)),
+      ]);
 
       return { message: `${files.length} files deleted successfully from R2 and Database` };
     } catch (error) {
@@ -309,31 +321,28 @@ export class FileService {
     }
   }
 
-  async deleteAllByWorkspace(workspace_id: number, user_id: number) {
-    const workspace = await this.workspaceRepo.findOne({ where: { workspace_id }, relations: ['user'] });
-    validateWorkspaceExists(workspace);
-    validateWorkspaceOwnership(workspace!, user_id);
+  async loadWorkspaceFiles(workspace_id: number): Promise<File[]> {
+    return this.fileRepo.find({ where: { workspace: { workspace_id } } });
+  }
 
-    const files = await this.fileRepo.find({
-      where: { workspace: { workspace_id } },
-    });
+  async runMinioCleanup(files: File[], user_id: number, workspace_id: number): Promise<void> {
+    if (files.length === 0) return;
 
-    if (files.length > 0) {
-      const paths = files.map(f => f.minio_path);
-      const totalSize = files.reduce((sum, f) => sum + Number(f.size), 0);
-      await this.minioClient.removeObjects(this.bucketName, paths);
-      await this.fileRepo.remove(files);
+    const paths = files.map(f => f.minio_path);
+    const totalSize = files.reduce((sum, f) => sum + Number(f.size), 0);
 
-      const ownerUser = await this.userRepo.findOne({ where: { user_id } });
-      if (ownerUser) {
-        await this.userRepo.update(user_id, {
-          usedStorage: Math.max(0, Number(ownerUser.usedStorage) - totalSize),
-        });
-      }
+    await this.minioClient.removeObjects(this.bucketName, paths);
 
-      await Promise.all(files.map(f => this.cacheManager.del(`cache_user_${user_id}_file_url_${f.file_id}`)));
+    const ownerUser = await this.userRepo.findOne({ where: { user_id } });
+    if (ownerUser) {
+      await this.userRepo.update(user_id, {
+        usedStorage: Math.max(0, Number(ownerUser.usedStorage) - totalSize),
+      });
     }
 
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`);
+    await Promise.all([
+      ...files.map(f => this.delCache(`cache_user_${user_id}_file_url_${f.file_id}`)),
+      this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`),
+    ]);
   }
 }

@@ -5,26 +5,17 @@ import { AppModule } from '../../app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { User } from '../../entities/user-entity';
 import { Repository } from 'typeorm';
+import { TestHelper } from '../../test-utils/test-helper';
 
 describe('User Management End-to-End Tests', () => {
   let app: INestApplication;
-  let userRepository: Repository<User>;
+  let userRepo: Repository<User>;
   let jwtToken: string;
   let secondUserToken: string;
   let createdUserId: number;
-  let secondUserId: number;
 
-  const testUser = {
-    name: `User_${Date.now()}`,
-    email: `user_${Date.now()}@synapse.com`,
-    password: 'SecurePassword123!',
-  };
-
-  const secondUser = {
-    name: `User2_${Date.now()}`,
-    email: `user2_${Date.now()}@synapse.com`,
-    password: 'SecurePassword123!',
-  };
+  const u1 = TestHelper.generateUserData('user1');
+  const u2 = TestHelper.generateUserData('user2');
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -34,22 +25,15 @@ describe('User Management End-to-End Tests', () => {
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-    userRepository = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
+    userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
 
-    await request(app.getHttpServer()).post('/v1/auth/register').send(testUser);
-    const user = await userRepository.findOne({ where: { email: testUser.email } });
-    createdUserId = user!.user_id;
-    await request(app.getHttpServer()).post('/v1/auth/verify').send({ email: testUser.email, code: user!.verification_code });
-    const loginRes = await request(app.getHttpServer()).post('/v1/auth/login').send({ name: testUser.name, password: testUser.password });
-    jwtToken = loginRes.body.token;
+    const result1 = await TestHelper.createUser(app, userRepo, u1);
+    jwtToken = result1.token;
+    createdUserId = result1.userId;
 
-    await request(app.getHttpServer()).post('/v1/auth/register').send(secondUser);
-    const user2 = await userRepository.findOne({ where: { email: secondUser.email } });
-    secondUserId = user2!.user_id;
-    await request(app.getHttpServer()).post('/v1/auth/verify').send({ email: secondUser.email, code: user2!.verification_code });
-    const loginRes2 = await request(app.getHttpServer()).post('/v1/auth/login').send({ name: secondUser.name, password: secondUser.password });
-    secondUserToken = loginRes2.body.token;
+    const result2 = await TestHelper.createUser(app, userRepo, u2);
+    secondUserToken = result2.token;
   }, 30000);
 
   describe('Security Check', () => {
@@ -68,11 +52,9 @@ describe('User Management End-to-End Tests', () => {
         .expect(200);
 
       expect(res.body).toHaveProperty('user_id', createdUserId);
-      expect(res.body).toHaveProperty('email', testUser.email);
+      expect(res.body).toHaveProperty('email', u1.email);
       expect(res.body).not.toHaveProperty('password');
     });
-
-
 
     it('should return 404 for non-existent user', () => {
       return request(app.getHttpServer())
@@ -104,9 +86,21 @@ describe('User Management End-to-End Tests', () => {
         .expect(400);
     });
 
+    it('should return 400 when name is shorter than 3 characters', () => {
+      return request(app.getHttpServer())
+        .put(`/v1/users/${createdUserId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({ name: 'Yo' })
+        .expect(400);
+    });
 
-
-
+    it('should return 200 when updating with empty body since all fields are optional', () => {
+      return request(app.getHttpServer())
+        .put(`/v1/users/${createdUserId}`)
+        .set('Authorization', `Bearer ${jwtToken}`)
+        .send({})
+        .expect(200);
+    });
 
     it('should return 404 when updating non-existent user', () => {
       return request(app.getHttpServer())
@@ -118,8 +112,6 @@ describe('User Management End-to-End Tests', () => {
   });
 
   describe('DELETE /v1/users/:id', () => {
-
-
     it('should successfully delete the user', async () => {
       const res = await request(app.getHttpServer())
         .delete(`/v1/users/${createdUserId}`)
@@ -138,8 +130,8 @@ describe('User Management End-to-End Tests', () => {
   });
 
   afterAll(async () => {
-    const user2 = await userRepository.findOne({ where: { email: secondUser.email } });
-    if (user2) await userRepository.remove(user2);
+    await TestHelper.cleanupUser(userRepo, u1.email);
+    await TestHelper.cleanupUser(userRepo, u2.email);
     await app.close();
   });
 });

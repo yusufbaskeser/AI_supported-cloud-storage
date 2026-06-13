@@ -19,12 +19,15 @@ export class UserCacheInterceptor implements NestInterceptor {
     if (request.method !== 'GET') return next.handle();
 
     const cacheKey = `cache_user_${request.user?.user_id}_url_${request.url}`;
-    const cached = await this.cacheManager.get(cacheKey);
-    if (cached) return of(cached);
+
+    try {
+      const cached = await this.cacheManager.get(cacheKey);
+      if (cached) return of(cached);
+    } catch {}
 
     return next.handle().pipe(
       tap(async (data) => {
-        await this.cacheManager.set(cacheKey, data, 90000);
+        try { await this.cacheManager.set(cacheKey, data, 90000); } catch {}
       }),
     );
   }
