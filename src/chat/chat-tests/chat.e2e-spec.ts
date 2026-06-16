@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from 'src/app.module';
-import { JwtAuthGuard } from 'src/guard/jwt-auth-guard';
+import { AppModule } from '../../app.module';
+import { JwtAuthGuard } from '../../guard/jwt-auth-guard';
 import { ChatService } from '../chat-service';
 
 jest.setTimeout(120000);
@@ -14,14 +14,29 @@ describe('Chat Controller (Integration)', () => {
 
   const mockUser = { user_id: 1, name: 'John Doe', email: 'john@example.com' };
   const mockFiles = [
-    { file_id: 1, filename: 'landscape.jpg', tags: ['nature', 'photo'], size: 2097152 },
-    { file_id: 2, filename: 'report.pdf', mime_type: 'application/pdf', size: 524288 },
+    {
+      file_id: 1,
+      filename: 'landscape.jpg',
+      tags: ['nature', 'photo'],
+      size: 2097152,
+    },
+    {
+      file_id: 2,
+      filename: 'report.pdf',
+      mime_type: 'application/pdf',
+      size: 524288,
+    },
   ];
 
   beforeAll(async () => {
-    const secureFixture = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const secureFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     secureApp = secureFixture.createNestApplication();
-    secureApp.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    secureApp.enableVersioning({ type: VersioningType.URI });
+    secureApp.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await secureApp.init();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -38,7 +53,10 @@ describe('Chat Controller (Integration)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.enableVersioning({ type: VersioningType.URI });
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     await app.init();
 
     try {
@@ -54,7 +72,7 @@ describe('Chat Controller (Integration)', () => {
 
   const sendChatMessage = (msg: string) => {
     return request(app.getHttpServer())
-      .post('/chat/message')
+      .post('/v1/chat/message')
       .set('Authorization', 'Bearer fake-token')
       .send({ message: msg });
   };
@@ -62,7 +80,7 @@ describe('Chat Controller (Integration)', () => {
   describe('Security Check', () => {
     it('should return 401 when no token is provided', async () => {
       await request(secureApp.getHttpServer())
-        .post('/chat/message')
+        .post('/v1/chat/message')
         .send({ message: 'hello' })
         .expect(401);
     });
@@ -71,7 +89,7 @@ describe('Chat Controller (Integration)', () => {
   describe('POST /chat/message', () => {
     it('should return 400 when message is empty', async () => {
       await request(app.getHttpServer())
-        .post('/chat/message')
+        .post('/v1/chat/message')
         .set('Authorization', 'Bearer fake-token')
         .send({ message: '' })
         .expect(400);
@@ -79,7 +97,7 @@ describe('Chat Controller (Integration)', () => {
 
     it('should return 400 when message field is missing', async () => {
       await request(app.getHttpServer())
-        .post('/chat/message')
+        .post('/v1/chat/message')
         .set('Authorization', 'Bearer fake-token')
         .send({})
         .expect(400);
@@ -134,7 +152,11 @@ describe('Chat Controller (Integration)', () => {
     });
 
     it('should find large files over 50MB', async () => {
-      const largeFile = { file_id: 3, filename: 'video.mp4', size: 100 * 1024 * 1024 };
+      const largeFile = {
+        file_id: 3,
+        filename: 'video.mp4',
+        size: 100 * 1024 * 1024,
+      };
 
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'Found large files',
@@ -178,10 +200,14 @@ describe('Chat Controller (Integration)', () => {
       jest.spyOn(chatService, 'handleMessage').mockResolvedValueOnce({
         reply: 'Generating a shareable link for your file.',
         action: 'generate_link',
-        files: [{ file_id: mockFiles[0].file_id, filename: mockFiles[0].filename }],
+        files: [
+          { file_id: mockFiles[0].file_id, filename: mockFiles[0].filename },
+        ],
       });
 
-      const res = await sendChatMessage('Generate a link for my landscape photo');
+      const res = await sendChatMessage(
+        'Generate a link for my landscape photo',
+      );
       expect(res.status).toBe(201);
       expect(res.body.action).toBe('generate_link');
       expect(res.body.files.length).toBeGreaterThan(0);

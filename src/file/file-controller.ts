@@ -29,16 +29,18 @@ export class FileController {
   constructor(private readonly fileService: FileService) {}
 
   @Post('workspaces/:workspace_id/files')
-  @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @UseInterceptors(FilesInterceptor('files', 10, {
-    limits: { fileSize: 50 * 1024 * 1024 },
-  }))
+  @Throttle({ default: { limit: 20, ttl: 60 } })
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
   async uploadFiles(
     @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @UploadedFiles() files: Express.Multer.File[],
     @Request() req,
   ) {
-    files?.forEach(f => {
+    files?.forEach((f) => {
       f.originalname = Buffer.from(f.originalname, 'latin1').toString('utf8');
     });
     return this.fileService.uploadFiles(files, workspace_id, req.user.user_id);
@@ -51,7 +53,12 @@ export class FileController {
     @Query('limit') limit = 20,
     @Request() req,
   ) {
-    return this.fileService.findFilesByWorkspace(workspace_id, req.user.user_id, Number(page), Number(limit));
+    return this.fileService.findFilesByWorkspace(
+      workspace_id,
+      req.user.user_id,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Get(':file_id/url')
@@ -68,7 +75,10 @@ export class FileController {
     @Param('file_id', ParseIntPipe) file_id: number,
     @Request() req,
   ) {
-    const url = await this.fileService.getFileDownloadUrl(file_id, req.user.user_id);
+    const url = await this.fileService.getFileDownloadUrl(
+      file_id,
+      req.user.user_id,
+    );
     return { url };
   }
 
@@ -78,7 +88,11 @@ export class FileController {
     @Query('expiry') expiry: string,
     @Request() req,
   ) {
-    return this.fileService.generateShareUrl(file_id, req.user.user_id, Number(expiry) || 3600);
+    return this.fileService.generateShareUrl(
+      file_id,
+      req.user.user_id,
+      Number(expiry) || 3600,
+    );
   }
 
   @Put(':file_id')
@@ -87,7 +101,11 @@ export class FileController {
     @Body() updateDto: UpdateFilenameRequestDto,
     @Request() req,
   ): Promise<FileResponseDto> {
-    return this.fileService.updateFilename(file_id, updateDto.filename, req.user.user_id);
+    return this.fileService.updateFilename(
+      file_id,
+      updateDto.filename,
+      req.user.user_id,
+    );
   }
 
   @Delete('bulk-delete')

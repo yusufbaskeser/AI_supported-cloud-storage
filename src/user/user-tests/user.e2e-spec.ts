@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -24,7 +28,9 @@ describe('User Management End-to-End Tests', () => {
 
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
 
@@ -56,14 +62,11 @@ describe('User Management End-to-End Tests', () => {
       expect(res.body).not.toHaveProperty('password');
     });
 
-    it('should return 404 for non-existent user', () => {
+    it('should return 403 when accessing another user profile', () => {
       return request(app.getHttpServer())
         .get('/v1/users/99999')
         .set('Authorization', `Bearer ${jwtToken}`)
-        .expect(404)
-        .expect((res) => {
-          expect(res.body.message).toBe('User not found');
-        });
+        .expect(403);
     });
   });
 
@@ -102,12 +105,12 @@ describe('User Management End-to-End Tests', () => {
         .expect(200);
     });
 
-    it('should return 404 when updating non-existent user', () => {
+    it('should return 403 when updating another user profile', () => {
       return request(app.getHttpServer())
         .put('/v1/users/99999')
         .set('Authorization', `Bearer ${jwtToken}`)
         .send({ name: 'Someone' })
-        .expect(404);
+        .expect(403);
     });
   });
 

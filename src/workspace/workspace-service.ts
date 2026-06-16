@@ -12,17 +12,21 @@ import { DeleteWorkspaceResponseDto } from './dto/delete-workspace-response-dto'
 import { WorkspaceValidations } from './workspace-validations/workspace-validations';
 import { FileService } from '../file/file-service';
 
-const { validateWorkspaceExists, validateWorkspaceOwnership } = WorkspaceValidations;
+const { validateWorkspaceExists, validateWorkspaceOwnership } =
+  WorkspaceValidations;
 
 @Injectable()
 export class WorkspaceService {
   constructor(
-    @InjectRepository(Workspace) private workspaceRepository: Repository<Workspace>,
+    @InjectRepository(Workspace)
+    private workspaceRepository: Repository<Workspace>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private fileService: FileService,
   ) {}
 
-  async findAllWorkspacesByUser(user_id: number): Promise<WorkspaceResponseDto[]> {
+  async findAllWorkspacesByUser(
+    user_id: number,
+  ): Promise<WorkspaceResponseDto[]> {
     const rows = await this.workspaceRepository
       .createQueryBuilder('ws')
       .leftJoin('ws.files', 'f')
@@ -33,7 +37,7 @@ export class WorkspaceService {
       .orderBy('ws.created_at', 'DESC')
       .getRawMany();
 
-    return rows.map(r => ({
+    return rows.map((r) => ({
       workspace_id: r.ws_workspace_id,
       name: r.ws_name,
       description: r.ws_description,
@@ -42,7 +46,10 @@ export class WorkspaceService {
     }));
   }
 
-  async findWorkspaceById(workspace_id: number, user_id: number): Promise<WorkspaceResponseDto> {
+  async findWorkspaceById(
+    workspace_id: number,
+    user_id: number,
+  ): Promise<WorkspaceResponseDto> {
     const workspace = await this.workspaceRepository.findOne({
       where: { workspace_id },
       relations: ['user'],
@@ -58,13 +65,21 @@ export class WorkspaceService {
   }
 
   private async delCache(key: string): Promise<void> {
-    try { await this.cacheManager.del(key); } catch {}
+    try {
+      await this.cacheManager.del(key);
+    } catch {}
   }
 
-  async createWorkspace(createDto: CreateWorkspaceDto, user_id: number): Promise<WorkspaceResponseDto> {
-    const workspace = this.workspaceRepository.create({ ...createDto, user: { user_id } });
+  async createWorkspace(
+    createDto: CreateWorkspaceDto,
+    user_id: number,
+  ): Promise<WorkspaceResponseDto> {
+    const workspace = this.workspaceRepository.create({
+      ...createDto,
+      user: { user_id },
+    });
     const saved = await this.workspaceRepository.save(workspace);
-    this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
+    await this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
     return {
       workspace_id: saved.workspace_id,
       name: saved.name,
@@ -74,13 +89,20 @@ export class WorkspaceService {
     };
   }
 
-  async updateWorkspace(workspace_id: number, updateDto: UpdateWorkspaceDto, user_id: number): Promise<WorkspaceResponseDto> {
-    const workspace = await this.workspaceRepository.findOne({ where: { workspace_id }, relations: ['user'] });
+  async updateWorkspace(
+    workspace_id: number,
+    updateDto: UpdateWorkspaceDto,
+    user_id: number,
+  ): Promise<WorkspaceResponseDto> {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { workspace_id },
+      relations: ['user'],
+    });
     validateWorkspaceExists(workspace);
     validateWorkspaceOwnership(workspace!, user_id);
     Object.assign(workspace!, updateDto);
     const updated = await this.workspaceRepository.save(workspace!);
-    this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
+    await this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
     return {
       workspace_id: updated.workspace_id,
       name: updated.name,
@@ -89,14 +111,22 @@ export class WorkspaceService {
     };
   }
 
-  async deleteWorkspace(workspace_id: number, user_id: number): Promise<DeleteWorkspaceResponseDto> {
-    const workspace = await this.workspaceRepository.findOne({ where: { workspace_id }, relations: ['user'] });
+  async deleteWorkspace(
+    workspace_id: number,
+    user_id: number,
+  ): Promise<DeleteWorkspaceResponseDto> {
+    const workspace = await this.workspaceRepository.findOne({
+      where: { workspace_id },
+      relations: ['user'],
+    });
     validateWorkspaceExists(workspace);
     validateWorkspaceOwnership(workspace!, user_id);
     const files = await this.fileService.loadWorkspaceFiles(workspace_id);
     await this.workspaceRepository.delete({ workspace_id });
-    this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
-    this.fileService.runMinioCleanup(files, user_id, workspace_id).catch(() => {});
+    await this.delCache(`cache_user_${user_id}_url_/v1/workspaces`);
+    this.fileService.runMinioCleanup(files, user_id, workspace_id).catch((err) =>
+      console.error('MinIO cleanup failed for workspace', workspace_id, err),
+    );
     return { message: 'Workspace successfully deleted' };
   }
 }

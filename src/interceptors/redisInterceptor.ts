@@ -14,7 +14,10 @@ import { tap } from 'rxjs/operators';
 export class UserCacheInterceptor implements NestInterceptor {
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
-  async intercept(context: ExecutionContext, next: CallHandler): Promise<Observable<any>> {
+  async intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
     if (request.method !== 'GET') return next.handle();
 
@@ -27,7 +30,9 @@ export class UserCacheInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(async (data) => {
-        try { await this.cacheManager.set(cacheKey, data, 90000); } catch {}
+        try {
+          await this.cacheManager.set(cacheKey, data, 90 * 1000);
+        } catch {}
       }),
     );
   }

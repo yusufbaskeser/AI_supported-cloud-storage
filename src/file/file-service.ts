@@ -1,4 +1,9 @@
-import { Injectable, Inject, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { File } from '../entities/file-entity';
@@ -13,15 +18,25 @@ import {
   validateWorkspaceExists,
   validateWorkspaceOwnership,
   validateFileExists,
-  validateFileOwnership
+  validateFileOwnership,
 } from './file-validations/file-validations';
-import { AITagGenerator } from 'src/utils/ai-tag-generator';
-import { createMinioClient } from 'src/utils/minio-client';
+import { AITagGenerator } from '../utils/ai-tag-generator';
+import { createMinioClient } from '../utils/minio-client';
 
 const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-  'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo',
-  'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  'audio/webm',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -29,7 +44,9 @@ const ALLOWED_MIME_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain', 'text/csv', 'application/json',
+  'text/plain',
+  'text/csv',
+  'application/json',
 ]);
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -51,27 +68,45 @@ export class FileService {
   }
 
   private async delCache(key: string): Promise<void> {
-    try { await this.cacheManager.del(key); } catch {}
+    try {
+      await this.cacheManager.del(key);
+    } catch {}
   }
 
   private async getCache<T>(key: string): Promise<T | undefined> {
-    try { return await this.cacheManager.get<T>(key) ?? undefined; } catch { return undefined; }
+    try {
+      return (await this.cacheManager.get<T>(key)) ?? undefined;
+    } catch {
+      return undefined;
+    }
   }
 
-  private async setCache(key: string, value: unknown, ttl: number): Promise<void> {
-    try { await this.cacheManager.set(key, value, ttl); } catch {}
+  private async setCache(
+    key: string,
+    value: unknown,
+    ttl: number,
+  ): Promise<void> {
+    try {
+      await this.cacheManager.set(key, value, ttl);
+    } catch {}
   }
 
   private validateFile(file: Express.Multer.File): void {
     if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException(`File "${file.originalname}" exceeds the 50MB size limit`);
+      throw new BadRequestException(
+        `File "${file.originalname}" exceeds the 50MB size limit`,
+      );
     }
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      throw new BadRequestException(`File type "${file.mimetype}" is not allowed`);
+      throw new BadRequestException(
+        `File type "${file.mimetype}" is not allowed`,
+      );
     }
   }
 
-  private async checkContentSafety(file: Express.Multer.File): Promise<boolean> {
+  private async checkContentSafety(
+    file: Express.Multer.File,
+  ): Promise<boolean> {
     try {
       if (!file.mimetype.startsWith('image/')) return true;
 
@@ -79,10 +114,16 @@ export class FileService {
         {
           role: 'user',
           content: [
-            { type: 'text', text: "Does this image contain inappropriate content (violence, nudity, illegal items)? Reply only 'true' for inappropriate or 'false' for safe." },
-            { type: 'image_url', image_url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}` }
-          ]
-        }
+            {
+              type: 'text',
+              text: "Does this image contain inappropriate content (violence, nudity, illegal items)? Reply only 'true' for inappropriate or 'false' for safe.",
+            },
+            {
+              type: 'image_url',
+              image_url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}`,
+            },
+          ],
+        },
       ]);
 
       return !response.content.toString().toLowerCase().includes('true');
@@ -96,7 +137,6 @@ export class FileService {
     workspace_id: number,
     user_id: number,
   ): Promise<FileResponseDto[]> {
-
     if (!files || files.length === 0) {
       throw new BadRequestException('No files provided');
     }
@@ -108,7 +148,7 @@ export class FileService {
     validateWorkspaceExists(workspace);
     validateWorkspaceOwnership(workspace!, user_id);
 
-    files.forEach(file => this.validateFile(file));
+    files.forEach((file) => this.validateFile(file));
 
     const user = await this.userRepo.findOne({ where: { user_id } });
     if (user) {
@@ -118,7 +158,7 @@ export class FileService {
       if (currentUsage + totalNewSize > limit) {
         const remainingMB = ((limit - currentUsage) / (1024 * 1024)).toFixed(1);
         throw new BadRequestException(
-          `Storage limit exceeded. You have ${remainingMB} MB remaining out of your 5 GB quota.`
+          `Storage limit exceeded. You have ${remainingMB} MB remaining out of your 5 GB quota.`,
         );
       }
     }
@@ -136,7 +176,7 @@ export class FileService {
           minioPath,
           file.buffer,
           file.buffer.length,
-          { 'Content-Type': file.mimetype }
+          { 'Content-Type': file.mimetype },
         );
 
         try {
@@ -152,26 +192,29 @@ export class FileService {
           this.generateAndSaveTags(saved.file_id, file).catch(console.error);
           return saved;
         } catch (err) {
-          await this.minioClient.removeObject(this.bucketName, minioPath).catch(() => {});
+          await this.minioClient
+            .removeObject(this.bucketName, minioPath)
+            .catch(() => {});
           throw err;
         }
-      })
+      }),
     );
-    const successfulFiles = uploadedFiles.filter((f) => f !== null) as File[];
+    const successfulFiles = uploadedFiles.filter((f) => f !== null);
     if (successfulFiles.length > 0) {
-      const uploadedSize = successfulFiles.reduce((sum, f) => sum + Number(f.size), 0);
+      const uploadedSize = successfulFiles.reduce(
+        (sum, f) => sum + Number(f.size),
+        0,
+      );
       await this.userRepo.increment({ user_id }, 'usedStorage', uploadedSize);
     }
     await Promise.all([
-      this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`),
+      this.delCache(
+        `cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`,
+      ),
       this.delCache(`cache_user_${user_id}_url_/v1/workspaces`),
     ]);
     return successfulFiles as FileResponseDto[];
   }
-
-
-
-
 
   private async generateAndSaveTags(fileId: number, file: Express.Multer.File) {
     try {
@@ -188,7 +231,10 @@ export class FileService {
     page = 1,
     limit = 20,
   ): Promise<{ data: FileResponseDto[]; total: number; hasMore: boolean }> {
-    const workspace = await this.workspaceRepo.findOne({ where: { workspace_id }, relations: ['user'] });
+    const workspace = await this.workspaceRepo.findOne({
+      where: { workspace_id },
+      relations: ['user'],
+    });
     validateWorkspaceExists(workspace);
     validateWorkspaceOwnership(workspace!, user_id);
 
@@ -215,8 +261,13 @@ export class FileService {
     validateFileExists(file);
     validateFileOwnership(file!, user_id);
 
-    const url = await this.minioClient.presignedUrl('GET', this.bucketName, file!.minio_path, 3600);
-    await this.setCache(cacheKey, url, 3_300_000);
+    const url = await this.minioClient.presignedUrl(
+      'GET',
+      this.bucketName,
+      file!.minio_path,
+      3600,
+    );
+    await this.setCache(cacheKey, url, 90 * 1000);
 
     return url;
   }
@@ -243,7 +294,11 @@ export class FileService {
     return url;
   }
 
-  async generateShareUrl(file_id: number, user_id: number, expirySeconds: number): Promise<{ url: string; expires_at: string }> {
+  async generateShareUrl(
+    file_id: number,
+    user_id: number,
+    expirySeconds: number,
+  ): Promise<{ url: string; expires_at: string }> {
     const file = await this.fileRepo.findOne({
       where: { file_id },
       relations: ['workspace', 'workspace.user'],
@@ -252,14 +307,26 @@ export class FileService {
     validateFileExists(file);
     validateFileOwnership(file!, user_id);
 
-    const clamped = Math.min(Math.max(Number(expirySeconds) || 3600, 300), 7 * 24 * 3600);
-    const url = await this.minioClient.presignedUrl('GET', this.bucketName, file!.minio_path, clamped);
+    const clamped = Math.min(
+      Math.max(Number(expirySeconds) || 3600, 300),
+      7 * 24 * 3600,
+    );
+    const url = await this.minioClient.presignedUrl(
+      'GET',
+      this.bucketName,
+      file!.minio_path,
+      clamped,
+    );
     const expiresAt = new Date(Date.now() + clamped * 1000).toISOString();
 
     return { url, expires_at: expiresAt };
   }
 
-  async updateFilename(file_id: number, filename: string, user_id: number): Promise<FileResponseDto> {
+  async updateFilename(
+    file_id: number,
+    filename: string,
+    user_id: number,
+  ): Promise<FileResponseDto> {
     const file = await this.fileRepo.findOne({
       where: { file_id },
       relations: ['workspace', 'workspace.user'],
@@ -271,13 +338,18 @@ export class FileService {
     file!.filename = filename;
     const updatedFile = await this.fileRepo.save(file!);
 
-    await this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${file!.workspace.workspace_id}/files`);
+    await this.delCache(
+      `cache_user_${user_id}_url_/v1/files/workspaces/${file!.workspace.workspace_id}/files`,
+    );
     await this.delCache(`cache_user_${user_id}_file_url_${file_id}`);
 
     return updatedFile;
   }
 
-  async bulkDelete(file_ids: number[], user_id: number): Promise<DeleteFileResponseDto> {
+  async bulkDelete(
+    file_ids: number[],
+    user_id: number,
+  ): Promise<DeleteFileResponseDto> {
     if (!file_ids || !Array.isArray(file_ids) || file_ids.length === 0) {
       return { message: 'No file IDs provided' };
     }
@@ -291,10 +363,12 @@ export class FileService {
       return { message: 'No files found in database' };
     }
 
-    files.forEach(f => validateFileOwnership(f, user_id));
+    files.forEach((f) => validateFileOwnership(f, user_id));
 
-    const workspaceId = files[0].workspace.workspace_id;
-    const pathsToDelete = files.map(f => f.minio_path);
+    const affectedWorkspaceIds = [
+      ...new Set(files.map((f) => f.workspace.workspace_id)),
+    ];
+    const pathsToDelete = files.map((f) => f.minio_path);
     const totalDeletedSize = files.reduce((sum, f) => sum + Number(f.size), 0);
 
     try {
@@ -304,17 +378,28 @@ export class FileService {
       const ownerUser = await this.userRepo.findOne({ where: { user_id } });
       if (ownerUser) {
         await this.userRepo.update(user_id, {
-          usedStorage: Math.max(0, Number(ownerUser.usedStorage) - totalDeletedSize),
+          usedStorage: Math.max(
+            0,
+            Number(ownerUser.usedStorage) - totalDeletedSize,
+          ),
         });
       }
 
       await Promise.all([
-        this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${workspaceId}/files`),
+        ...affectedWorkspaceIds.map((wsId) =>
+          this.delCache(
+            `cache_user_${user_id}_url_/v1/files/workspaces/${wsId}/files`,
+          ),
+        ),
         this.delCache(`cache_user_${user_id}_url_/v1/workspaces`),
-        ...files.map(f => this.delCache(`cache_user_${user_id}_file_url_${f.file_id}`)),
+        ...files.map((f) =>
+          this.delCache(`cache_user_${user_id}_file_url_${f.file_id}`),
+        ),
       ]);
 
-      return { message: `${files.length} files deleted successfully from R2 and Database` };
+      return {
+        message: `${files.length} files deleted successfully from R2 and Database`,
+      };
     } catch (error) {
       console.error('Bulk Delete Error:', error);
       throw new InternalServerErrorException('Failed to delete files');
@@ -325,10 +410,14 @@ export class FileService {
     return this.fileRepo.find({ where: { workspace: { workspace_id } } });
   }
 
-  async runMinioCleanup(files: File[], user_id: number, workspace_id: number): Promise<void> {
+  async runMinioCleanup(
+    files: File[],
+    user_id: number,
+    workspace_id: number,
+  ): Promise<void> {
     if (files.length === 0) return;
 
-    const paths = files.map(f => f.minio_path);
+    const paths = files.map((f) => f.minio_path);
     const totalSize = files.reduce((sum, f) => sum + Number(f.size), 0);
 
     await this.minioClient.removeObjects(this.bucketName, paths);
@@ -341,8 +430,12 @@ export class FileService {
     }
 
     await Promise.all([
-      ...files.map(f => this.delCache(`cache_user_${user_id}_file_url_${f.file_id}`)),
-      this.delCache(`cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`),
+      ...files.map((f) =>
+        this.delCache(`cache_user_${user_id}_file_url_${f.file_id}`),
+      ),
+      this.delCache(
+        `cache_user_${user_id}_url_/v1/files/workspaces/${workspace_id}/files`,
+      ),
     ]);
   }
 }

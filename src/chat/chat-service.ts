@@ -8,7 +8,11 @@ import { User } from '../entities/user-entity';
 import { File } from '../entities/file-entity';
 import { Workspace } from '../entities/workspace-entity';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages';
+import {
+  HumanMessage,
+  SystemMessage,
+  AIMessage,
+} from '@langchain/core/messages';
 import { ChatResponseDto } from './dto/chat-response-dto';
 import { validateUserExists } from './chat-validations/chat-validations';
 import * as fs from 'fs';
@@ -138,6 +142,21 @@ Optional: singular, file_type, min_size_mb, max_size_mb, days_ago
 - "last week" = days_ago:7, "yesterday" = days_ago:1, "this month" = days_ago:30
 - For completely NEW topics → use search_files with fresh query (clears previous context)
 
+━━━ CRITICAL: WHEN TO USE search_files (FRESH) vs next_result/refine ━━━
+ALWAYS use search_files (fresh) when the user asks for a DIFFERENT specific file:
+  → different color: "gray cat" after "orange cat" → NEW search_files for "gray cat"
+  → different subject: "my dog" after "my cat" → NEW search_files for "dog"
+  → different file: "the report" after "the photo" → NEW search_files for "report"
+ONLY use next_result when user explicitly says: "other", "another", "next", "different one", "not this"
+ONLY use refine_results when user FILTERS the SAME results: "the gray one from those", "only PDFs"
+
+QUERY LANGUAGE: Always write the query field in ENGLISH regardless of user language.
+  → User says "gri kedi" → query: "gray cat"
+  → User says "turuncu araba" → query: "orange car"
+EXCEPTION — custom file names / nicknames: If the user refers to a file by a name they personally gave it (visible in conversation history as a renamed filename), use that EXACT name as-is in the query. Do NOT translate it.
+  → User renamed a file to "tatlı" then says "bring tatlı" → query: "tatlı"  (do NOT translate to "sweet" or "cute")
+  → User renamed a file to "rapor2024" then says "open rapor2024" → query: "rapor2024"
+
 RULES:
 - For delete operations: always warn the user what will be deleted and tell them confirmation is needed. Never delete without showing a confirmation button.
 - For rename: do it directly, no confirmation needed.
@@ -147,6 +166,19 @@ RULES:
 - Use conversation history to resolve references ("move them there", "that workspace", etc.).
 - Do NOT put actions inside a code block.
 - Always respond in English.
+
+━━━ CONVERSATION vs ACTION RULES ━━━
+These are CONVERSATIONAL questions — respond with text ONLY, NO action directive:
+  "how did you know?", "why that one?", "how does this work?", "what is this?",
+  "tell me more", "explain", "what do you think?", "are you sure?", "interesting",
+  "thank you", "thanks", "ok", "great", "cool", "wow", "nice", "good job",
+  Any question about YOU or HOW YOU WORK → text only, no action.
+
+━━━ RESPONSE LENGTH — CRITICAL ━━━
+Keep ALL replies SHORT. Maximum 1-2 sentences.
+- File actions: write NOTHING before the action line. Zero preamble. No "I've got you", no "I'm gathering", no "Sure!", no "Of course!", no filler of any kind. JUST the [ACTION:...] line.
+- Conversational answers: 1-2 sentences max. Be direct. No essays, no lists, no lengthy explanations.
+- NEVER start a reply with the user's name.
 `;
 
 @Injectable()
@@ -157,7 +189,11 @@ export class ChatService {
 
   private getSession(user_id: number): UserSession {
     if (!this.sessions.has(user_id)) {
-      this.sessions.set(user_id, { lastResults: [], lastQuery: '', shownIds: new Set() });
+      this.sessions.set(user_id, {
+        lastResults: [],
+        lastQuery: '',
+        shownIds: new Set(),
+      });
     }
     return this.sessions.get(user_id)!;
   }
@@ -188,24 +224,83 @@ export class ChatService {
 
     try {
       const siteInfoDir = path.join(__dirname, 'site-info');
-      const files = fs.readdirSync(siteInfoDir).filter(f => f.endsWith('.txt')).sort();
+      const files = fs
+        .readdirSync(siteInfoDir)
+        .filter((f) => f.endsWith('.txt'))
+        .sort();
       this.systemPrompt = files
-        .map(f => fs.readFileSync(path.join(siteInfoDir, f), 'utf-8').trim())
+        .map((f) => fs.readFileSync(path.join(siteInfoDir, f), 'utf-8').trim())
         .join('\n\n---\n\n');
     } catch {
-      this.systemPrompt = 'You are Syn, a helpful AI assistant for SynapseCloud, an AI-powered cloud storage system.';
+      this.systemPrompt =
+        'You are Syn, a helpful AI assistant for SynapseCloud, an AI-powered cloud storage system.';
     }
   }
 
-  async handleMessage(userMessage: string, user_id: number): Promise<ChatResponseDto> {
+  private async classifyIntent(message: string): Promise<'file' | 'chat'> {
+    try {
+      const res = await this.aiModel.invoke([
+        new HumanMessage(
+          `Classify this user message. Reply ONLY with the word "file" or "chat".
+
+"file" = user wants to do something with their files or storage:
+  - search, find, show, bring, get, fetch, list files/photos/videos/documents
+  - delete, remove, rename, move, share files
+  - create workspace, get storage stats, generate a link
+  - asking about specific content they have stored ("my cat photo", "the report")
+
+"chat" = user wants to have a conversation (no file operation intended):
+  - greetings, farewells, thanks, acknowledgements (hi, hello, thanks, ok, great, cool)
+  - asking questions about the AI or how things work
+  - follow-up questions about a previous response ("how did you know?", "why that one?", "are you sure?")
+  - opinions, explanations, general knowledge questions
+  - short reactions (yes, no, wow, nice, interesting)
+  - any message that does NOT require accessing or modifying files
+
+Message: "${message.replace(/"/g, "'")}"
+
+Reply with exactly one word — "file" or "chat":`,
+        ),
+      ]);
+      const answer = res.content.toString().toLowerCase().trim();
+      return answer.startsWith('file') ? 'file' : 'chat';
+    } catch {
+      return 'file';
+    }
+  }
+
+  async handleMessage(
+    userMessage: string,
+    user_id: number,
+  ): Promise<ChatResponseDto> {
     const user = await this.getUserInfo(user_id);
     validateUserExists(user);
 
     const history = await this.getConversationHistory(user_id, 20);
     await this.saveMessage(user_id, ChatRole.USER, userMessage);
 
-    const response = await this.getAIResponse(userMessage, user!.name, user_id, history);
-    await this.saveMessage(user_id, ChatRole.ASSISTANT, response.reply);
+    const intent = await this.classifyIntent(userMessage);
+    if (intent === 'chat') {
+      const reply = await this.getConversationalResponse(userMessage, user!.name);
+      await this.saveMessage(user_id, ChatRole.ASSISTANT, reply);
+      return { reply, action: 'general' };
+    }
+
+    const response = await this.getAIResponse(
+      userMessage,
+      user!.name,
+      user_id,
+      history,
+    );
+
+    if (!response.reply && response.action !== 'search_files' && response.toast) {
+      response.reply = response.toast;
+    }
+
+    const historyText =
+      response.reply ||
+      (response.files?.length ? `Found ${response.files.length} file(s).` : 'Done.');
+    await this.saveMessage(user_id, ChatRole.ASSISTANT, historyText);
 
     return response;
   }
@@ -217,8 +312,14 @@ export class ChatService {
     history: Chat[],
   ): Promise<ChatResponseDto> {
     const messages = [
-      new SystemMessage(`${this.systemPrompt}\n\n${ACTION_INSTRUCTIONS}\n\nUser's name: ${userName}`),
-      ...history.map(h => h.role === ChatRole.USER ? new HumanMessage(h.message) : new AIMessage(h.message)),
+      new SystemMessage(
+        `${this.systemPrompt}\n\n${ACTION_INSTRUCTIONS}\n\nUser's name: ${userName}`,
+      ),
+      ...history.map((h) =>
+        h.role === ChatRole.USER
+          ? new HumanMessage(h.message)
+          : new AIMessage(h.message),
+      ),
       new HumanMessage(userMessage),
     ];
 
@@ -227,40 +328,74 @@ export class ChatService {
 
     if (actions.length === 0) return { reply: cleanReply, action: 'general' };
 
-    let merged: ChatResponseDto = { reply: cleanReply, action: 'general' };
+    const merged: ChatResponseDto = { reply: cleanReply, action: 'general' };
     for (const act of actions) {
       const result = await this.executeAction(act, cleanReply, user_id);
       if (result.files !== undefined) merged.files = result.files;
       if (result.stats !== undefined) merged.stats = result.stats;
       if (result.action !== 'general') merged.action = result.action;
-      if (result.toast) merged.toast = merged.toast ? `${merged.toast} • ${result.toast}` : result.toast;
+      if (result.toast)
+        merged.toast = merged.toast
+          ? `${merged.toast} • ${result.toast}`
+          : result.toast;
       if (result.workspace_id) merged.workspace_id = result.workspace_id;
       if (result.workspace_name) merged.workspace_name = result.workspace_name;
     }
+
+    if (merged.action === 'search_files') {
+      if (!merged.files || merged.files.length === 0) {
+        merged.reply = "I couldn't find any files matching your request.";
+        merged.files = [];
+      } else {
+        const fillerPattern = /^(here|i found|found it|i('ve| have) got|i('ll| will)|let me|looking|searching|bringing|fetching|sure|okay|of course|i can see|i located|i'm gathering|gathering|absolutely|great|perfect|right away|on it|got it|certainly|no problem)/i;
+        if (fillerPattern.test(merged.reply.trim()) || merged.reply.trim().length < 5) {
+          merged.reply = '';
+        }
+      }
+    }
+
     return merged;
   }
 
-  private parseActionDirectives(raw: string): { cleanReply: string; actions: ActionDirective[] } {
+  private parseActionDirectives(raw: string): {
+    cleanReply: string;
+    actions: ActionDirective[];
+  } {
     const actions: ActionDirective[] = [];
     const replyParts: string[] = [];
     let i = 0;
 
     while (i < raw.length) {
       const idx = raw.indexOf('[ACTION:{', i);
-      if (idx === -1) { replyParts.push(raw.slice(i)); break; }
+      if (idx === -1) {
+        replyParts.push(raw.slice(i));
+        break;
+      }
 
       replyParts.push(raw.slice(i, idx));
 
-      let depth = 0, jsonEnd = -1;
+      let depth = 0,
+        jsonEnd = -1;
       for (let j = idx + 8; j < raw.length; j++) {
         if (raw[j] === '{') depth++;
-        else if (raw[j] === '}') { depth--; if (depth === 0) { jsonEnd = j; break; } }
+        else if (raw[j] === '}') {
+          depth--;
+          if (depth === 0) {
+            jsonEnd = j;
+            break;
+          }
+        }
       }
 
-      if (jsonEnd === -1) { replyParts.push(raw.slice(idx)); break; }
+      if (jsonEnd === -1) {
+        replyParts.push(raw.slice(idx));
+        break;
+      }
 
       try {
-        actions.push(JSON.parse(raw.slice(idx + 8, jsonEnd + 1)) as ActionDirective);
+        actions.push(
+          JSON.parse(raw.slice(idx + 8, jsonEnd + 1)) as ActionDirective,
+        );
       } catch {}
 
       i = jsonEnd + 2;
@@ -269,15 +404,20 @@ export class ChatService {
     return { cleanReply: replyParts.join('').trim(), actions };
   }
 
-  private async executeAction(action: ActionDirective, reply: string, user_id: number): Promise<ChatResponseDto> {
+  private async executeAction(
+    action: ActionDirective,
+    reply: string,
+    user_id: number,
+  ): Promise<ChatResponseDto> {
     switch (action.type) {
-
       case 'search_files': {
         const query = (action.query || '').trim();
         const isAll = !query || /^all$/i.test(query);
         let matches = isAll
           ? await this.getAllUserFiles(user_id)
-          : await this.searchFiles(query, user_id, { daysAgo: action.days_ago });
+          : await this.searchFiles(query, user_id, {
+              daysAgo: action.days_ago,
+            });
 
         matches = this.applyFilters(matches, action);
 
@@ -287,23 +427,33 @@ export class ChatService {
         session.shownIds = new Set();
 
         const toShow = action.singular ? matches.slice(0, 1) : matches;
-        toShow.forEach(f => session.shownIds.add(f.file_id));
+        toShow.forEach((f) => session.shownIds.add(f.file_id));
 
-        return { reply, files: toShow.map(f => this.toFileDto(f)), action: 'search_files' };
+        return {
+          reply,
+          files: toShow.map((f) => this.toFileDto(f)),
+          action: 'search_files',
+        };
       }
 
       case 'next_result': {
         const session = this.getSession(user_id);
-        let unseen = session.lastResults.filter(f => !session.shownIds.has(f.file_id));
+        let unseen = session.lastResults.filter(
+          (f) => !session.shownIds.has(f.file_id),
+        );
 
         if (unseen.length === 0 && session.lastQuery) {
           const fresh = await this.searchFiles(session.lastQuery, user_id);
-          unseen = fresh.filter(f => !session.shownIds.has(f.file_id));
-          if (unseen.length > 0) session.lastResults = [...session.lastResults, ...unseen];
+          unseen = fresh.filter((f) => !session.shownIds.has(f.file_id));
+          if (unseen.length > 0)
+            session.lastResults = [...session.lastResults, ...unseen];
         }
 
         if (unseen.length === 0) {
-          return { reply: "No more matching files — all results have been shown.", action: 'general' };
+          return {
+            reply: 'No more matching files — all results have been shown.',
+            action: 'general',
+          };
         }
 
         const next = unseen[0];
@@ -313,28 +463,53 @@ export class ChatService {
 
       case 'refine_results': {
         const session = this.getSession(user_id);
-        let pool = session.lastResults.length > 0 ? [...session.lastResults] : await this.getAllUserFiles(user_id);
+        let pool =
+          session.lastResults.length > 0
+            ? [...session.lastResults]
+            : await this.getAllUserFiles(user_id);
 
         const query = (action.query || '').trim();
         if (query) {
           const tags = this.extractQueryTags(query);
           if (tags.length > 0) {
             const scored = pool
-              .map(f => ({ f, score: (f.tags ?? []).filter(t => tags.some(q => t === q || t.includes(q) || q.includes(t))).length }))
-              .filter(x => x.score > 0)
+              .map((f) => {
+                const fileTags = f.tags ?? [];
+                const total = fileTags.length || 1;
+                let score = 0;
+                tags.forEach((q) => {
+                  fileTags.forEach((t, idx) => {
+                    const posBonus = 1 - idx / total;
+                    if (t === q) score += 3 + posBonus;
+                    else if (t.includes(q) && q.length > 2) score += 1.5 + posBonus * 0.5;
+                    else if (q.includes(t) && t.length > 2) score += 1 + posBonus * 0.3;
+                  });
+                });
+                return { f, score };
+              })
+              .filter((x) => x.score > 0)
               .sort((a, b) => b.score - a.score);
-            if (scored.length > 0) pool = scored.map(x => x.f);
+            if (scored.length > 0) pool = scored.map((x) => x.f);
           }
         }
 
         pool = this.applyFilters(pool, action);
 
+        if (pool.length === 0 && query) {
+          const freshResults = await this.searchFiles(query, user_id);
+          if (freshResults.length > 0) pool = freshResults;
+        }
+
         session.lastResults = pool;
         session.shownIds = new Set();
         const toShow = action.singular ? pool.slice(0, 1) : pool;
-        toShow.forEach(f => session.shownIds.add(f.file_id));
+        toShow.forEach((f) => session.shownIds.add(f.file_id));
 
-        return { reply, files: toShow.map(f => this.toFileDto(f)), action: 'search_files' };
+        return {
+          reply,
+          files: toShow.map((f) => this.toFileDto(f)),
+          action: 'search_files',
+        };
       }
 
       case 'delete_files': {
@@ -348,7 +523,7 @@ export class ChatService {
 
         return {
           reply,
-          files: matches.map(f => ({
+          files: matches.map((f) => ({
             file_id: f.file_id,
             filename: f.filename,
             tags: f.tags,
@@ -365,13 +540,19 @@ export class ChatService {
         const workspace = await this.workspaceRepo.findOne({
           where: { name: wsName, user: { user_id } },
         });
-        if (!workspace) return { reply: `Workspace "${wsName}" not found.`, action: 'general' };
+        if (!workspace)
+          return {
+            reply: `Workspace "${wsName}" not found.`,
+            action: 'general',
+          };
 
-        const files = await this.fileRepo.find({ where: { workspace: { workspace_id: workspace.workspace_id } } });
+        const files = await this.fileRepo.find({
+          where: { workspace: { workspace_id: workspace.workspace_id } },
+        });
 
         return {
           reply,
-          files: files.map(f => ({
+          files: files.map((f) => ({
             file_id: f.file_id,
             filename: f.filename,
             mime_type: f.mime_type,
@@ -390,10 +571,15 @@ export class ChatService {
 
         const matches = await this.searchFiles(query, user_id);
         const file = matches[0];
-        if (!file) return { reply: `File "${query}" not found.`, action: 'general' };
+        if (!file)
+          return { reply: `File "${query}" not found.`, action: 'general' };
 
         await this.fileRepo.update(file.file_id, { filename: newName });
-        return { reply, action: 'rename_file', toast: `Renamed "${file.filename}" → "${newName}".` };
+        return {
+          reply,
+          action: 'rename_file',
+          toast: `Renamed "${file.filename}" → "${newName}".`,
+        };
       }
 
       case 'generate_link': {
@@ -402,7 +588,15 @@ export class ChatService {
         const file = files[0] ?? null;
         return {
           reply,
-          files: file ? [{ file_id: file.file_id, filename: file.filename, mime_type: file.mime_type }] : [],
+          files: file
+            ? [
+                {
+                  file_id: file.file_id,
+                  filename: file.filename,
+                  mime_type: file.mime_type,
+                },
+              ]
+            : [],
           action: 'generate_link',
         };
       }
@@ -410,15 +604,28 @@ export class ChatService {
       case 'create_workspace': {
         const wsName = (action.name || 'New Workspace').trim();
         await this.createWorkspace(wsName, user_id);
-        return { reply, action: 'general', toast: `Workspace "${wsName}" created.` };
+        return {
+          reply,
+          action: 'general',
+          toast: `Workspace "${wsName}" created.`,
+        };
       }
 
       case 'move_all_files': {
         const target = (action.target_workspace || '').trim();
         if (target) {
           const files = await this.getAllUserFiles(user_id);
-          if (files.length > 0) await this.batchMove(target, files.map(f => f.file_id), user_id);
-          return { reply, action: 'general', toast: `Moved ${files.length} file${files.length !== 1 ? 's' : ''} to "${target}".` };
+          if (files.length > 0)
+            await this.batchMove(
+              target,
+              files.map((f) => f.file_id),
+              user_id,
+            );
+          return {
+            reply,
+            action: 'general',
+            toast: `Moved ${files.length} file${files.length !== 1 ? 's' : ''} to "${target}".`,
+          };
         }
         return { reply, action: 'general' };
       }
@@ -428,14 +635,27 @@ export class ChatService {
         const query = (action.query || '').trim();
         if (target && query) {
           const files = await this.searchFiles(query, user_id);
-          if (files.length > 0) await this.batchMove(target, files.map(f => f.file_id), user_id);
-          return { reply, action: 'general', toast: `Moved ${files.length} file${files.length !== 1 ? 's' : ''} to "${target}".` };
+          if (files.length > 0)
+            await this.batchMove(
+              target,
+              files.map((f) => f.file_id),
+              user_id,
+            );
+          return {
+            reply,
+            action: 'general',
+            toast: `Moved ${files.length} file${files.length !== 1 ? 's' : ''} to "${target}".`,
+          };
         }
         return { reply, action: 'general' };
       }
 
       case 'get_stats':
-        return { reply, stats: await this.getFileStats(user_id), action: 'stats' };
+        return {
+          reply,
+          stats: await this.getFileStats(user_id),
+          action: 'stats',
+        };
 
       default:
         return { reply, action: 'general' };
@@ -447,26 +667,28 @@ export class ChatService {
 
     if (action.workspace_name) {
       const wn = action.workspace_name.toLowerCase();
-      result = result.filter(f => f.workspace?.name?.toLowerCase() === wn);
+      result = result.filter((f) => f.workspace?.name?.toLowerCase() === wn);
     }
 
     if (action.file_type) {
-      result = result.filter(f => this.matchesFileType(f.mime_type, action.file_type!));
+      result = result.filter((f) =>
+        this.matchesFileType(f.mime_type, action.file_type!),
+      );
     }
 
     if (action.min_size_mb !== undefined) {
       const minBytes = action.min_size_mb * 1_048_576;
-      result = result.filter(f => Number(f.size) >= minBytes);
+      result = result.filter((f) => Number(f.size) >= minBytes);
     }
 
     if (action.max_size_mb !== undefined) {
       const maxBytes = action.max_size_mb * 1_048_576;
-      result = result.filter(f => Number(f.size) <= maxBytes);
+      result = result.filter((f) => Number(f.size) <= maxBytes);
     }
 
     if (action.days_ago !== undefined) {
       const since = new Date(Date.now() - action.days_ago * 86_400_000);
-      result = result.filter(f => new Date(f.uploaded_at) >= since);
+      result = result.filter((f) => new Date(f.uploaded_at) >= since);
     }
 
     return result;
@@ -475,15 +697,28 @@ export class ChatService {
   private matchesFileType(mime: string, type: string): boolean {
     const m = (mime || '').toLowerCase();
     switch (type.toLowerCase()) {
-      case 'pdf':          return m === 'application/pdf';
-      case 'image':        return m.startsWith('image/');
-      case 'video':        return m.startsWith('video/');
-      case 'audio':        return m.startsWith('audio/');
-      case 'document':     return m.includes('word') || m.includes('document') || m === 'application/msword';
-      case 'spreadsheet':  return m.includes('sheet') || m.includes('excel');
-      case 'presentation': return m.includes('presentation') || m.includes('powerpoint');
-      case 'text':         return m.startsWith('text/');
-      default:             return true;
+      case 'pdf':
+        return m === 'application/pdf';
+      case 'image':
+        return m.startsWith('image/');
+      case 'video':
+        return m.startsWith('video/');
+      case 'audio':
+        return m.startsWith('audio/');
+      case 'document':
+        return (
+          m.includes('word') ||
+          m.includes('document') ||
+          m === 'application/msword'
+        );
+      case 'spreadsheet':
+        return m.includes('sheet') || m.includes('excel');
+      case 'presentation':
+        return m.includes('presentation') || m.includes('powerpoint');
+      case 'text':
+        return m.startsWith('text/');
+      default:
+        return true;
     }
   }
 
@@ -497,31 +732,61 @@ export class ChatService {
 
     if (options?.daysAgo !== undefined) {
       const since = new Date(Date.now() - options.daysAgo * 86_400_000);
-      allFiles = allFiles.filter(f => new Date(f.uploaded_at) >= since);
+      allFiles = allFiles.filter((f) => new Date(f.uploaded_at) >= since);
     }
+
+    const exactMatch = allFiles.filter(
+      (f) => f.filename.toLowerCase().replace(/\.[^.]+$/, '') === query.toLowerCase().trim(),
+    );
+    if (exactMatch.length > 0) return exactMatch;
 
     const searchTags = this.extractQueryTags(query);
 
     if (searchTags.length > 0) {
       const scored = allFiles
-        .map(f => ({
-          f,
-          score: (f.tags ?? []).filter(t =>
-            searchTags.some(q => t === q || t.includes(q) || q.includes(t))
-          ).length,
-        }))
-        .filter(x => x.score > 0)
+        .map((f) => {
+          const fileTags = f.tags ?? [];
+          const total = fileTags.length || 1;
+          let score = 0;
+          searchTags.forEach((q) => {
+            fileTags.forEach((t, idx) => {
+              const posBonus = 1 - idx / total;
+              if (t === q) {
+                score += 3 + posBonus;
+              } else if (t.includes(q) && q.length > 2) {
+                score += 1.5 + posBonus * 0.5;
+              } else if (q.includes(t) && t.length > 2) {
+                score += 1 + posBonus * 0.3;
+              }
+            });
+          });
+          return { f, score };
+        })
+        .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score);
 
-      if (scored.length > 0) return scored.map(x => x.f).slice(0, 20);
+      if (scored.length > 0) return scored.map((x) => x.f).slice(0, 20);
     }
 
-    const nameFallback = allFiles.filter(f => {
-      const name = f.filename.toLowerCase().replace(/\.[^.]+$/, '');
-      return searchTags.some(w => name.includes(w));
-    }).slice(0, 20);
+    const nameFallback = allFiles
+      .filter((f) => {
+        const name = f.filename.toLowerCase().replace(/\.[^.]+$/, '');
+        return searchTags.some((w) => name.includes(w));
+      })
+      .slice(0, 20);
 
     if (nameFallback.length > 0) return nameFallback;
+
+    const rawQ = query.toLowerCase().trim();
+    const rawWords = rawQ.split(/\s+/).filter((w) => w.length > 1);
+    const rawFallback = allFiles
+      .filter((f) => {
+        const name = f.filename.toLowerCase().replace(/\.[^.]+$/, '');
+        return name.includes(rawQ) || rawWords.some((w) => name.includes(w));
+      })
+      .slice(0, 20);
+
+    if (rawFallback.length > 0) return rawFallback;
 
     return this.aiFileSelector(query, allFiles);
   }
@@ -530,10 +795,11 @@ export class ChatService {
     if (!files.length) return [];
 
     const list = files
-      .filter(f => (f.tags || []).length > 0)
+      .filter((f) => (f.tags || []).length > 0)
       .slice(0, 50)
-      .map(f =>
-        `${f.file_id}: "${f.filename}" | ${(f.tags || []).slice(0, 10).join(', ')} | ${new Date(f.uploaded_at).toLocaleDateString()}`
+      .map(
+        (f) =>
+          `${f.file_id}: "${f.filename}" | ${(f.tags || []).slice(0, 10).join(', ')} | ${new Date(f.uploaded_at).toLocaleDateString()}`,
       )
       .join('\n');
 
@@ -550,8 +816,11 @@ Return ONLY the matching file IDs as comma-separated numbers. If none match, ret
       const res = await this.aiModel.invoke([new HumanMessage(prompt)]);
       const raw = res.content.toString().trim().toLowerCase();
       if (!raw || raw === 'none') return [];
-      const ids = raw.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-      return files.filter(f => ids.includes(f.file_id)).slice(0, 20);
+      const ids = raw
+        .split(',')
+        .map((s) => parseInt(s.trim()))
+        .filter((n) => !isNaN(n));
+      return files.filter((f) => ids.includes(f.file_id)).slice(0, 20);
     } catch {
       return [];
     }
@@ -559,27 +828,117 @@ Return ONLY the matching file IDs as comma-separated numbers. If none match, ret
 
   private extractQueryTags(query: string): string[] {
     const stopwords = new Set([
-      'the','and','or','of','in','on','at','to','a','an','is','are','was','were',
-      'my','your','our','their','its','his','her','can','you','bring','show',
-      'find','get','please','me','i','we','it','that','this','with','for','from',
-      'by','about','all','any','have','has','do','does','did','will','would',
-      'could','should','want','need','give','take','see','look','let','those',
-      'these','file','files','photo','photos','image','images','picture',
-      'pictures','document','documents','video','videos','audio',
+      'the',
+      'and',
+      'or',
+      'of',
+      'in',
+      'on',
+      'at',
+      'to',
+      'a',
+      'an',
+      'is',
+      'are',
+      'was',
+      'were',
+      'my',
+      'your',
+      'our',
+      'their',
+      'its',
+      'his',
+      'her',
+      'can',
+      'you',
+      'bring',
+      'show',
+      'find',
+      'get',
+      'please',
+      'me',
+      'i',
+      'we',
+      'it',
+      'that',
+      'this',
+      'with',
+      'for',
+      'from',
+      'by',
+      'about',
+      'all',
+      'any',
+      'have',
+      'has',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'want',
+      'need',
+      'give',
+      'take',
+      'see',
+      'look',
+      'let',
+      'those',
+      'these',
+      'file',
+      'files',
+      'photo',
+      'photos',
+      'image',
+      'images',
+      'picture',
+      'pictures',
+      'document',
+      'documents',
+      'video',
+      'videos',
+      'audio',
     ]);
 
-    const synonyms: Record<string, string[]> = {
-      'grey': ['gray'], 'gray': ['grey'],
-      'cat': ['kitten', 'kitty', 'feline'],
-      'dog': ['puppy', 'canine'],
-      'cv': ['resume'], 'resume': ['cv'],
-      'pic': ['photo'], 'photo': ['pic'],
+    const trToEn: Record<string, string> = {
+      gri: 'gray', turuncu: 'orange', kirmizi: 'red', mavi: 'blue',
+      yesil: 'green', sari: 'yellow', beyaz: 'white', siyah: 'black',
+      kahverengi: 'brown', mor: 'purple', pembe: 'pink', lacivert: 'navy',
+      kedi: 'cat', kopek: 'dog', kus: 'bird', balik: 'fish',
+      araba: 'car', ev: 'house', agac: 'tree', cicek: 'flower',
+      insan: 'person', cocuk: 'child', kadinlar: 'women', erkek: 'man',
+      resim: 'image', fotograf: 'photo', belge: 'document', video: 'video',
+      getir: '', goster: '', bul: '', ver: '', istiyorum: '', lutfen: '',
     };
 
-    const words = query.toLowerCase()
+    const synonyms: Record<string, string[]> = {
+      grey: ['gray', 'gray fur', 'grey fur'],
+      gray: ['grey', 'gray fur', 'grey fur'],
+      orange: ['orange fur', 'orange coat'],
+      black: ['black fur', 'black coat'],
+      white: ['white fur', 'white coat'],
+      brown: ['brown fur', 'brown coat'],
+      cream: ['cream fur', 'cream coat'],
+      tabby: ['tabby', 'striped fur'],
+      cat: ['kitten', 'kitty', 'feline'],
+      dog: ['puppy', 'canine'],
+      cv: ['resume'],
+      resume: ['cv'],
+      pic: ['photo'],
+      photo: ['pic'],
+    };
+
+    const rawWords = query
+      .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
       .split(/\s+/)
-      .filter(w => w.length > 1 && !stopwords.has(w));
+      .filter((w) => w.length > 1);
+
+    const words = rawWords
+      .map((w) => (trToEn[w] !== undefined ? trToEn[w] : w))
+      .filter((w) => w.length > 1 && !stopwords.has(w));
 
     const expanded: string[] = [...words];
     for (const w of words) {
@@ -604,32 +963,56 @@ Return ONLY the matching file IDs as comma-separated numbers. If none match, ret
     const files = await this.getAllUserFiles(user_id);
     const totalSize = files.reduce((s, f) => s + Number(f.size), 0);
     const largest = files.length
-      ? files.reduce((m, f) => (Number(f.size) > Number(m.size) ? f : m), files[0])
+      ? files.reduce(
+          (m, f) => (Number(f.size) > Number(m.size) ? f : m),
+          files[0],
+        )
       : null;
 
     const tagCounts: Record<string, number> = {};
-    files.forEach(f => (f.tags ?? []).forEach(t => { tagCounts[t] = (tagCounts[t] ?? 0) + 1; }));
+    files.forEach((f) =>
+      (f.tags ?? []).forEach((t) => {
+        tagCounts[t] = (tagCounts[t] ?? 0) + 1;
+      }),
+    );
 
     return {
       total_files: files.length,
       total_size_mb: (totalSize / 1_048_576).toFixed(2),
       largest_file: largest?.filename ?? null,
-      most_used_tags: Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]),
+      most_used_tags: Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map((e) => e[0]),
     };
   }
 
   private createWorkspace(name: string, user_id: number) {
-    return this.workspaceRepo.save(this.workspaceRepo.create({ name, description: '', user: { user_id } }));
+    return this.workspaceRepo.save(
+      this.workspaceRepo.create({ name, description: '', user: { user_id } }),
+    );
   }
 
-  private async batchMove(workspaceName: string, fileIds: number[], user_id: number) {
+  private async batchMove(
+    workspaceName: string,
+    fileIds: number[],
+    user_id: number,
+  ) {
     const filesToMove = await this.fileRepo.find({
       where: { file_id: In(fileIds) },
       relations: ['workspace'],
     });
-    const sourceIds = [...new Set(filesToMove.map(f => f.workspace?.workspace_id).filter((id): id is number => !!id))];
+    const sourceIds = [
+      ...new Set(
+        filesToMove
+          .map((f) => f.workspace?.workspace_id)
+          .filter((id): id is number => !!id),
+      ),
+    ];
 
-    let workspace = await this.workspaceRepo.findOne({ where: { name: workspaceName, user: { user_id } } });
+    let workspace = await this.workspaceRepo.findOne({
+      where: { name: workspaceName, user: { user_id } },
+    });
     if (!workspace) {
       workspace = await this.workspaceRepo.save(
         this.workspaceRepo.create({ name: workspaceName, user: { user_id } }),
@@ -645,11 +1028,18 @@ Return ONLY the matching file IDs as comma-separated numbers. If none match, ret
 
     const allIds = [...new Set([...sourceIds, workspace.workspace_id])];
     await Promise.all(
-      allIds.map(wsId => this.cacheManager.del(`cache_user_${user_id}_url_/v1/files/workspaces/${wsId}/files`)),
+      allIds.map((wsId) =>
+        this.cacheManager.del(
+          `cache_user_${user_id}_url_/v1/files/workspaces/${wsId}/files`,
+        ),
+      ),
     );
   }
 
-  private async getConversationHistory(user_id: number, limit = 20): Promise<Chat[]> {
+  private async getConversationHistory(
+    user_id: number,
+    limit = 20,
+  ): Promise<Chat[]> {
     const msgs = await this.chatRepo.find({
       where: { user: { user_id } },
       order: { created_at: 'DESC' },
@@ -662,7 +1052,24 @@ Return ONLY the matching file IDs as comma-separated numbers. If none match, ret
     return this.userRepo.findOne({ where: { user_id } });
   }
 
+  private async getConversationalResponse(
+    userMessage: string,
+    userName: string,
+  ): Promise<string> {
+    const messages = [
+      new SystemMessage(
+        `${this.systemPrompt}\n\nYou are Syn, a friendly AI assistant for SynapseCloud. Have a natural conversation with the user. Keep every reply to 1-2 sentences maximum — be direct and concise. Never write long explanations or lists. IMPORTANT: Do NOT mention, reference, or invent any file operations (renames, searches, deletions, uploads). Just respond to the user's current message. User's name: ${userName}`,
+      ),
+      new HumanMessage(userMessage),
+    ];
+
+    const raw = (await this.aiModel.invoke(messages)).content.toString();
+    return raw.trim();
+  }
+
   private async saveMessage(user_id: number, role: ChatRole, message: string) {
-    await this.chatRepo.save(this.chatRepo.create({ user: { user_id }, role, message }));
+    await this.chatRepo.save(
+      this.chatRepo.create({ user: { user_id }, role, message }),
+    );
   }
 }

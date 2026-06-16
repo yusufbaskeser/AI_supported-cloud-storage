@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -24,7 +28,9 @@ describe('Workspace Management End-to-End Tests', () => {
 
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
 
@@ -49,7 +55,10 @@ describe('Workspace Management End-to-End Tests', () => {
       const res = await request(app.getHttpServer())
         .post('/v1/workspaces')
         .set('Authorization', `Bearer ${user1Token}`)
-        .send({ name: 'Test Workspace', description: 'Testing workspace ownership' })
+        .send({
+          name: 'Test Workspace',
+          description: 'Testing workspace ownership',
+        })
         .expect(201);
 
       user1WorkspaceId = res.body.workspace_id;
@@ -83,9 +92,7 @@ describe('Workspace Management End-to-End Tests', () => {
 
   describe('GET /v1/workspaces', () => {
     it('should return 401 when no token is provided', () => {
-      return request(app.getHttpServer())
-        .get('/v1/workspaces')
-        .expect(401);
+      return request(app.getHttpServer()).get('/v1/workspaces').expect(401);
     });
 
     it('should return list of workspaces for authenticated user', async () => {
@@ -122,7 +129,9 @@ describe('Workspace Management End-to-End Tests', () => {
         .set('Authorization', `Bearer ${user2Token}`)
         .expect(403);
 
-      expect(res.body.message).toBe('You do not have permission to access this workspace');
+      expect(res.body.message).toBe(
+        'You do not have permission to access this workspace',
+      );
     });
 
     it('should return 404 for non-existent workspace', () => {

@@ -43,7 +43,10 @@ export class TestHelper {
     };
   }
 
-  static async deleteUser(userRepo: Repository<User>, email: string): Promise<void> {
+  static async deleteUser(
+    userRepo: Repository<User>,
+    email: string,
+  ): Promise<void> {
     const user = await userRepo.findOne({ where: { email } });
     if (user) await userRepo.remove(user);
   }
@@ -65,7 +68,9 @@ export class TestHelper {
     workspaceRepo: Repository<Workspace>,
     workspaceId: number,
   ): Promise<void> {
-    const workspace = await workspaceRepo.findOne({ where: { workspace_id: workspaceId } });
+    const workspace = await workspaceRepo.findOne({
+      where: { workspace_id: workspaceId },
+    });
     if (workspace) await workspaceRepo.remove(workspace);
   }
 
@@ -73,7 +78,9 @@ export class TestHelper {
     workspaceRepo: Repository<Workspace>,
     userId: number,
   ): Promise<void> {
-    const workspaces = await workspaceRepo.find({ where: { user: { user_id: userId } } });
+    const workspaces = await workspaceRepo.find({
+      where: { user: { user_id: userId } },
+    });
     if (workspaces.length > 0) await workspaceRepo.remove(workspaces);
   }
 
@@ -92,7 +99,10 @@ export class TestHelper {
     return { fileId: res.body[0]?.file_id };
   }
 
-  static async deleteFile(fileRepo: Repository<File>, fileId: number): Promise<void> {
+  static async deleteFile(
+    fileRepo: Repository<File>,
+    fileId: number,
+  ): Promise<void> {
     const file = await fileRepo.findOne({ where: { file_id: fileId } });
     if (file) await fileRepo.remove(file);
   }
@@ -101,11 +111,16 @@ export class TestHelper {
     fileRepo: Repository<File>,
     workspaceId: number,
   ): Promise<void> {
-    const files = await fileRepo.find({ where: { workspace: { workspace_id: workspaceId } } });
+    const files = await fileRepo.find({
+      where: { workspace: { workspace_id: workspaceId } },
+    });
     if (files.length > 0) await fileRepo.remove(files);
   }
 
-  static async deleteChatsByUser(chatRepo: Repository<Chat>, userId: number): Promise<void> {
+  static async deleteChatsByUser(
+    chatRepo: Repository<Chat>,
+    userId: number,
+  ): Promise<void> {
     const chats = await chatRepo.find({ where: { user: { user_id: userId } } });
     if (chats.length > 0) await chatRepo.remove(chats);
   }
@@ -118,7 +133,11 @@ export class TestHelper {
     if (user) await userRepo.remove(user);
   }
 
-  static generateUserData(prefix = 'test'): { name: string; email: string; password: string } {
+  static generateUserData(prefix = 'test'): {
+    name: string;
+    email: string;
+    password: string;
+  } {
     const ts = Date.now();
     return {
       name: `${prefix}_${ts}`,

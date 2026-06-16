@@ -35,7 +35,10 @@ export class WorkspaceController {
     @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @Request() req,
   ): Promise<WorkspaceResponseDto> {
-    return this.workspaceService.findWorkspaceById(workspace_id, req.user.user_id);
+    return this.workspaceService.findWorkspaceById(
+      workspace_id,
+      req.user.user_id,
+    );
   }
 
   @Post()
@@ -52,7 +55,11 @@ export class WorkspaceController {
     @Body() updateDto: UpdateWorkspaceDto,
     @Request() req,
   ): Promise<WorkspaceResponseDto> {
-    return this.workspaceService.updateWorkspace(workspace_id, updateDto, req.user.user_id);
+    return this.workspaceService.updateWorkspace(
+      workspace_id,
+      updateDto,
+      req.user.user_id,
+    );
   }
 
   @Delete(':workspace_id')
@@ -60,6 +67,9 @@ export class WorkspaceController {
     @Param('workspace_id', ParseIntPipe) workspace_id: number,
     @Request() req,
   ): Promise<DeleteWorkspaceResponseDto> {
-    return this.workspaceService.deleteWorkspace(workspace_id, req.user.user_id);
+    return this.workspaceService.deleteWorkspace(
+      workspace_id,
+      req.user.user_id,
+    );
   }
 }

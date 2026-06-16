@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import request from 'supertest';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -32,7 +36,11 @@ describe('File Management End-to-End Tests', () => {
   beforeAll(async () => {
     (Minio.Client as jest.Mock).mockImplementation(() => mockMinioClient);
     (AITagGenerator.initialize as jest.Mock).mockImplementation(() => {});
-    (AITagGenerator.generateTags as jest.Mock).mockResolvedValue(['test', 'mock', 'tag']);
+    (AITagGenerator.generateTags as jest.Mock).mockResolvedValue([
+      'test',
+      'mock',
+      'tag',
+    ]);
     (AITagGenerator.getModel as jest.Mock).mockReturnValue({
       invoke: jest.fn().mockResolvedValue({ content: 'false' }),
     });
@@ -43,7 +51,9 @@ describe('File Management End-to-End Tests', () => {
 
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
 
@@ -53,7 +63,11 @@ describe('File Management End-to-End Tests', () => {
     const result2 = await TestHelper.createUser(app, userRepo, u2);
     secondUserToken = result2.token;
 
-    const ws = await TestHelper.createWorkspace(app, jwtToken, 'Test Workspace');
+    const ws = await TestHelper.createWorkspace(
+      app,
+      jwtToken,
+      'Test Workspace',
+    );
     workspaceId = ws.workspaceId;
   }, 30000);
 
@@ -67,13 +81,9 @@ describe('File Management End-to-End Tests', () => {
         .post(`/v1/files/workspaces/${workspaceId}/files`)
         .expect(401);
 
-      await request(app.getHttpServer())
-        .get('/v1/files/1/url')
-        .expect(401);
+      await request(app.getHttpServer()).get('/v1/files/1/url').expect(401);
 
-      await request(app.getHttpServer())
-        .put('/v1/files/1')
-        .expect(401);
+      await request(app.getHttpServer()).put('/v1/files/1').expect(401);
 
       await request(app.getHttpServer())
         .delete('/v1/files/bulk-delete')
@@ -84,8 +94,12 @@ describe('File Management End-to-End Tests', () => {
   describe('POST /v1/files/workspaces/:workspace_id/files', () => {
     it('should successfully upload a file', async () => {
       const { fileId: id } = await TestHelper.uploadFile(
-        app, jwtToken, workspaceId,
-        Buffer.from('mock file content'), 'test.txt', 'text/plain',
+        app,
+        jwtToken,
+        workspaceId,
+        Buffer.from('mock file content'),
+        'test.txt',
+        'text/plain',
       );
       expect(id).toBeDefined();
       fileId = id;
@@ -95,8 +109,14 @@ describe('File Management End-to-End Tests', () => {
       const res = await request(app.getHttpServer())
         .post(`/v1/files/workspaces/${workspaceId}/files`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .attach('files', Buffer.from('file one content'), { filename: 'file1.txt', contentType: 'text/plain' })
-        .attach('files', Buffer.from('file two content'), { filename: 'file2.txt', contentType: 'text/plain' })
+        .attach('files', Buffer.from('file one content'), {
+          filename: 'file1.txt',
+          contentType: 'text/plain',
+        })
+        .attach('files', Buffer.from('file two content'), {
+          filename: 'file2.txt',
+          contentType: 'text/plain',
+        })
         .expect(201);
 
       expect(Array.isArray(res.body)).toBe(true);
@@ -111,7 +131,10 @@ describe('File Management End-to-End Tests', () => {
       const res = await request(app.getHttpServer())
         .post(`/v1/files/workspaces/${workspaceId}/files`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .attach('files', Buffer.from('fake image data'), { filename: 'unsafe-image.jpg', contentType: 'image/jpeg' })
+        .attach('files', Buffer.from('fake image data'), {
+          filename: 'unsafe-image.jpg',
+          contentType: 'image/jpeg',
+        })
         .expect(201);
 
       expect(Array.isArray(res.body)).toBe(true);
@@ -122,7 +145,10 @@ describe('File Management End-to-End Tests', () => {
       await request(app.getHttpServer())
         .post(`/v1/files/workspaces/${workspaceId}/files`)
         .set('Authorization', `Bearer ${secondUserToken}`)
-        .attach('files', Buffer.from('mock file content'), { filename: 'test.txt', contentType: 'text/plain' })
+        .attach('files', Buffer.from('mock file content'), {
+          filename: 'test.txt',
+          contentType: 'text/plain',
+        })
         .expect(403);
     });
 
@@ -130,7 +156,10 @@ describe('File Management End-to-End Tests', () => {
       await request(app.getHttpServer())
         .post('/v1/files/workspaces/99999/files')
         .set('Authorization', `Bearer ${jwtToken}`)
-        .attach('files', Buffer.from('mock file content'), { filename: 'test.txt', contentType: 'text/plain' })
+        .attach('files', Buffer.from('mock file content'), {
+          filename: 'test.txt',
+          contentType: 'text/plain',
+        })
         .expect(404);
     });
 
@@ -139,7 +168,10 @@ describe('File Management End-to-End Tests', () => {
       await request(app.getHttpServer())
         .post(`/v1/files/workspaces/${workspaceId}/files`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .attach('files', largeBuffer, { filename: 'large.txt', contentType: 'text/plain' })
+        .attach('files', largeBuffer, {
+          filename: 'large.txt',
+          contentType: 'text/plain',
+        })
         .expect((res) => {
           expect([400, 413]).toContain(res.status);
         });
@@ -149,7 +181,10 @@ describe('File Management End-to-End Tests', () => {
       await request(app.getHttpServer())
         .post(`/v1/files/workspaces/${workspaceId}/files`)
         .set('Authorization', `Bearer ${jwtToken}`)
-        .attach('files', Buffer.from('malicious content'), { filename: 'virus.exe', contentType: 'application/x-msdownload' })
+        .attach('files', Buffer.from('malicious content'), {
+          filename: 'virus.exe',
+          contentType: 'application/x-msdownload',
+        })
         .expect(400);
     });
 
@@ -184,7 +219,11 @@ describe('File Management End-to-End Tests', () => {
     });
 
     it('should return empty array for workspace with no files', async () => {
-      const { workspaceId: emptyWsId } = await TestHelper.createWorkspace(app, jwtToken, 'Empty Workspace');
+      const { workspaceId: emptyWsId } = await TestHelper.createWorkspace(
+        app,
+        jwtToken,
+        'Empty Workspace',
+      );
 
       const res = await request(app.getHttpServer())
         .get(`/v1/files/workspaces/${emptyWsId}/files`)
@@ -329,8 +368,12 @@ describe('File Management End-to-End Tests', () => {
 
     beforeEach(async () => {
       const { fileId: id } = await TestHelper.uploadFile(
-        app, jwtToken, workspaceId,
-        Buffer.from('mock file content'), 'to-delete.txt', 'text/plain',
+        app,
+        jwtToken,
+        workspaceId,
+        Buffer.from('mock file content'),
+        'to-delete.txt',
+        'text/plain',
       );
       bulkFileId = id;
       expect(bulkFileId).toBeDefined();
@@ -377,7 +420,7 @@ describe('File Management End-to-End Tests', () => {
   });
 
   afterAll(async () => {
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     await TestHelper.cleanupUser(userRepo, u1.email);
     await TestHelper.cleanupUser(userRepo, u2.email);
     await app.close();

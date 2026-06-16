@@ -33,7 +33,7 @@ export class AdminService {
 
   private async deleteFilesFromStorage(files: File[]) {
     if (files.length === 0) return;
-    const paths = files.map(f => f.minio_path);
+    const paths = files.map((f) => f.minio_path);
     await this.minioClient.removeObjects(this.bucketName, paths);
     await this.fileRepo.remove(files);
   }
@@ -43,7 +43,13 @@ export class AdminService {
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [totalUsers, totalFiles, totalWorkspaces, newUsersToday, newUsersWeek] = await Promise.all([
+    const [
+      totalUsers,
+      totalFiles,
+      totalWorkspaces,
+      newUsersToday,
+      newUsersWeek,
+    ] = await Promise.all([
       this.userRepo.count(),
       this.fileRepo.count(),
       this.workspaceRepo.count(),
@@ -51,8 +57,11 @@ export class AdminService {
       this.userRepo.count({ where: { created_at: MoreThan(oneWeekAgo) } }),
     ]);
 
-    const allFiles = await this.fileRepo.find({ select: ['size'] });
-    const globalTotalSize = allFiles.reduce((s, f) => s + Number(f.size), 0);
+    const raw = await this.fileRepo
+      .createQueryBuilder('f')
+      .select('COALESCE(SUM(f.size), 0)', 'totalSize')
+      .getRawOne<{ totalSize: string }>();
+    const globalTotalSize = Number(raw?.totalSize ?? 0);
 
     const topUsersByStorage = await this.userRepo.find({
       select: ['user_id', 'name', 'email', 'usedStorage', 'storageLimit'],
@@ -71,42 +80,59 @@ export class AdminService {
     };
   }
 
-  async findAllUsers(page = 1, limit = 20, filters?: {
-    dateFilter?: 'today' | 'week' | 'month';
-    minWorkspaces?: number;
-    maxWorkspaces?: number;
-    hasFiles?: 'yes' | 'no';
-    search?: string;
-  }) {
+  async findAllUsers(
+    page = 1,
+    limit = 20,
+    filters?: {
+      dateFilter?: 'today' | 'week' | 'month';
+      minWorkspaces?: number;
+      maxWorkspaces?: number;
+      hasFiles?: 'yes' | 'no';
+      search?: string;
+    },
+  ) {
     const buildQb = () => {
-      const qb = this.userRepo.createQueryBuilder('u')
+      const qb = this.userRepo
+        .createQueryBuilder('u')
         .leftJoin('u.workspaces', 'ws')
         .leftJoin('ws.files', 'f')
         .groupBy('u.user_id');
 
       if (filters?.search) {
-        qb.andWhere('(u.name LIKE :q OR u.email LIKE :q)', { q: `%${filters.search}%` });
+        qb.andWhere('(u.name LIKE :q OR u.email LIKE :q)', {
+          q: `%${filters.search}%`,
+        });
       }
       if (filters?.dateFilter) {
         const now = Date.now();
-        const from = filters.dateFilter === 'today'
-          ? new Date(new Date().setHours(0, 0, 0, 0))
-          : filters.dateFilter === 'week'
-            ? new Date(now - 7 * 24 * 60 * 60 * 1000)
-            : new Date(now - 30 * 24 * 60 * 60 * 1000);
+        const from =
+          filters.dateFilter === 'today'
+            ? new Date(new Date().setHours(0, 0, 0, 0))
+            : filters.dateFilter === 'week'
+              ? new Date(now - 7 * 24 * 60 * 60 * 1000)
+              : new Date(now - 30 * 24 * 60 * 60 * 1000);
         qb.andWhere('u.created_at >= :from', { from });
       }
 
       let firstHaving = true;
       const having = (clause: string, params?: object) => {
-        if (firstHaving) { qb.having(clause, params); firstHaving = false; }
-        else qb.andHaving(clause, params);
+        if (firstHaving) {
+          qb.having(clause, params);
+          firstHaving = false;
+        } else qb.andHaving(clause, params);
       };
 
-      if (filters?.minWorkspaces !== undefined) having('COUNT(DISTINCT ws.workspace_id) >= :minWs', { minWs: filters.minWorkspaces });
-      if (filters?.maxWorkspaces !== undefined) having('COUNT(DISTINCT ws.workspace_id) <= :maxWs', { maxWs: filters.maxWorkspaces });
+      if (filters?.minWorkspaces !== undefined)
+        having('COUNT(DISTINCT ws.workspace_id) >= :minWs', {
+          minWs: filters.minWorkspaces,
+        });
+      if (filters?.maxWorkspaces !== undefined)
+        having('COUNT(DISTINCT ws.workspace_id) <= :maxWs', {
+          maxWs: filters.maxWorkspaces,
+        });
       if (filters?.hasFiles === 'yes') having('COUNT(DISTINCT f.file_id) > 0');
-      else if (filters?.hasFiles === 'no') having('COUNT(DISTINCT f.file_id) = 0');
+      else if (filters?.hasFiles === 'no')
+        having('COUNT(DISTINCT f.file_id) = 0');
 
       return qb;
     };
@@ -116,8 +142,15 @@ export class AdminService {
 
     const data = await buildQb()
       .select([
-        'u.user_id', 'u.name', 'u.email', 'u.created_at', 'u.role',
-        'u.usedStorage', 'u.storageLimit', 'u.is_verified', 'u.profile_photo',
+        'u.user_id',
+        'u.name',
+        'u.email',
+        'u.created_at',
+        'u.role',
+        'u.usedStorage',
+        'u.storageLimit',
+        'u.is_verified',
+        'u.profile_photo',
       ])
       .addSelect('COUNT(DISTINCT ws.workspace_id)', 'workspaceCount')
       .addSelect('COUNT(DISTINCT f.file_id)', 'fileCount')
@@ -127,7 +160,7 @@ export class AdminService {
       .getRawMany();
 
     return {
-      data: data.map(u => ({
+      data: data.map((u) => ({
         user_id: u.u_user_id,
         name: u.u_name,
         email: u.u_email,
@@ -150,7 +183,7 @@ export class AdminService {
     const users = await this.userRepo.find({
       where: [{ email: Like(`%${query}%`) }, { name: Like(`%${query}%`) }],
     });
-    return users.map(u => this.omitPassword(u));
+    return users.map((u) => this.omitPassword(u));
   }
 
   async findUserDetail(id: number) {
@@ -164,7 +197,10 @@ export class AdminService {
       0,
     );
     const { password, resetPasswordToken, verification_code, ...safe } = user;
-    return { ...safe, userTotalSize_MB: (userTotalSize / 1024 ** 2).toFixed(2) };
+    return {
+      ...safe,
+      userTotalSize_MB: (userTotalSize / 1024 ** 2).toFixed(2),
+    };
   }
 
   async changeUserRole(id: number, newRole: UserRole) {
@@ -207,7 +243,10 @@ export class AdminService {
       .getMany();
 
     if (files.length > 0) {
-      await this.minioClient.removeObjects(this.bucketName, files.map(f => f.minio_path));
+      await this.minioClient.removeObjects(
+        this.bucketName,
+        files.map((f) => f.minio_path),
+      );
     }
 
     await this.userRepo.delete(id);
@@ -229,13 +268,19 @@ export class AdminService {
       take: limit,
     });
     return {
-      data: workspaces.map(ws => ({
+      data: workspaces.map((ws) => ({
         workspace_id: ws.workspace_id,
         name: ws.name,
         description: ws.description,
         created_at: ws.created_at,
         fileCount: ws.files?.length ?? 0,
-        owner: ws.user ? { user_id: ws.user.user_id, name: ws.user.name, email: ws.user.email } : null,
+        owner: ws.user
+          ? {
+              user_id: ws.user.user_id,
+              name: ws.user.name,
+              email: ws.user.email,
+            }
+          : null,
       })),
       total,
       page,
@@ -256,7 +301,9 @@ export class AdminService {
     await this.workspaceRepo.delete(id);
 
     if (workspace.user && totalSize > 0) {
-      const owner = await this.userRepo.findOne({ where: { user_id: workspace.user.user_id } });
+      const owner = await this.userRepo.findOne({
+        where: { user_id: workspace.user.user_id },
+      });
       if (owner) {
         await this.userRepo.update(owner.user_id, {
           usedStorage: Math.max(0, Number(owner.usedStorage) - totalSize),
@@ -268,7 +315,9 @@ export class AdminService {
       if (workspace.user) {
         const uid = workspace.user.user_id;
         await this.cacheManager.del(`cache_user_${uid}_url_/v1/workspaces`);
-        await this.cacheManager.del(`cache_user_${uid}_url_/v1/files/workspaces/${id}/files`);
+        await this.cacheManager.del(
+          `cache_user_${uid}_url_/v1/files/workspaces/${id}/files`,
+        );
       }
     } catch {}
 
@@ -284,21 +333,30 @@ export class AdminService {
       where: { workspace: { workspace_id: workspaceId } },
     });
     return Promise.all(
-      files.map(async f => ({
+      files.map(async (f) => ({
         ...f,
-        url: await this.minioClient.presignedUrl('GET', this.bucketName, f.minio_path, 3600),
+        url: await this.minioClient.presignedUrl(
+          'GET',
+          this.bucketName,
+          f.minio_path,
+          3600,
+        ),
       })),
     );
   }
 
   async findFilesWithoutTags() {
-    const all = await this.fileRepo.find();
-    return all.filter(f => !f.tags || f.tags.length === 0);
+    return this.fileRepo
+      .createQueryBuilder('f')
+      .where('f.tags IS NULL OR f.tags = :empty::jsonb', { empty: '[]' })
+      .getMany();
   }
 
   async findFilesByTag(tag: string) {
-    const all = await this.fileRepo.find();
-    return all.filter(f => f.tags?.includes(tag));
+    return this.fileRepo
+      .createQueryBuilder('f')
+      .where('f.tags @> :tag::jsonb', { tag: JSON.stringify([tag]) })
+      .getMany();
   }
 
   async forceDeleteFile(id: number) {
@@ -314,7 +372,9 @@ export class AdminService {
     await this.deleteFilesFromStorage([file]);
 
     if (ownerId) {
-      const owner = await this.userRepo.findOne({ where: { user_id: ownerId } });
+      const owner = await this.userRepo.findOne({
+        where: { user_id: ownerId },
+      });
       if (owner) {
         await this.userRepo.update(ownerId, {
           usedStorage: Math.max(0, Number(owner.usedStorage) - fileSize),
@@ -323,7 +383,9 @@ export class AdminService {
       try {
         await this.cacheManager.del(`cache_user_${ownerId}_file_url_${id}`);
         if (workspaceId) {
-          await this.cacheManager.del(`cache_user_${ownerId}_url_/v1/files/workspaces/${workspaceId}/files`);
+          await this.cacheManager.del(
+            `cache_user_${ownerId}_url_/v1/files/workspaces/${workspaceId}/files`,
+          );
         }
       } catch {}
     }

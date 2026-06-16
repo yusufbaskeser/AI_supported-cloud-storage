@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  INestApplication,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../../app.module';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -22,7 +26,9 @@ describe('Auth End-to-End Tests', () => {
 
     app = moduleFixture.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     userRepo = moduleFixture.get<Repository<User>>(getRepositoryToken(User));
     await app.init();
   }, 30000);
@@ -34,7 +40,9 @@ describe('Auth End-to-End Tests', () => {
         .send(testUser)
         .expect(201);
 
-      expect(res.body.message).toBe('Register successful! Please check your email for the verification code.');
+      expect(res.body.message).toBe(
+        'Register successful! Please check your email for the verification code.',
+      );
     }, 15000);
 
     it('should fail when registering with an existing email', async () => {
@@ -70,7 +78,11 @@ describe('Auth End-to-End Tests', () => {
     it('should fail with short password', async () => {
       await request(app.getHttpServer())
         .post('/v1/auth/register')
-        .send({ ...testUser, email: TestHelper.generateUserData('short').email, password: '123' })
+        .send({
+          ...testUser,
+          email: TestHelper.generateUserData('short').email,
+          password: '123',
+        })
         .expect(400);
     });
   });
@@ -158,14 +170,21 @@ describe('Auth End-to-End Tests', () => {
 
     it('should fail login for unverified account', async () => {
       unverifiedUserData = TestHelper.generateUserData('unverified');
-      await request(app.getHttpServer()).post('/v1/auth/register').send(unverifiedUserData);
+      await request(app.getHttpServer())
+        .post('/v1/auth/register')
+        .send(unverifiedUserData);
 
       const res = await request(app.getHttpServer())
         .post('/v1/auth/login')
-        .send({ name: unverifiedUserData.name, password: unverifiedUserData.password })
+        .send({
+          name: unverifiedUserData.name,
+          password: unverifiedUserData.password,
+        })
         .expect(401);
 
-      expect(res.body.message).toBe('Account not verified. Please check your email for the verification code.');
+      expect(res.body.message).toBe(
+        'Account not verified. Please check your email for the verification code.',
+      );
     });
   });
 
@@ -202,7 +221,10 @@ describe('Auth End-to-End Tests', () => {
 
       const res = await request(app.getHttpServer())
         .post('/v1/auth/reset-password')
-        .send({ token: user!.resetPasswordToken, newPassword: 'NewSecurePassword999!' })
+        .send({
+          token: user!.resetPasswordToken,
+          newPassword: 'NewSecurePassword999!',
+        })
         .expect(201);
 
       expect(res.body.message).toBe('Password updated successfully.');
@@ -255,7 +277,8 @@ describe('Auth End-to-End Tests', () => {
 
   afterAll(async () => {
     await TestHelper.cleanupUser(userRepo, testUser.email);
-    if (unverifiedUserData) await TestHelper.cleanupUser(userRepo, unverifiedUserData.email);
+    if (unverifiedUserData)
+      await TestHelper.cleanupUser(userRepo, unverifiedUserData.email);
     await app.close();
   });
 });

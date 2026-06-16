@@ -9,10 +9,10 @@ import { Workspace } from './workspace-entity';
 import { Chat } from './chat-entity';
 
 export enum UserRole {
-  USER        = 'user',
+  USER = 'user',
   VIEWER_ADMIN = 'viewer',
   EDITOR_ADMIN = 'editor',
-  SUPER_ADMIN  = 'super',
+  SUPER_ADMIN = 'super',
 }
 
 @Entity('users')
@@ -44,11 +44,11 @@ export class User {
   @Column({ type: 'timestamp', nullable: true, default: null })
   verification_code_expires: Date | null;
 
-  @Column({ nullable: true })
-  resetPasswordToken: string;
+  @Column({ type: 'varchar', nullable: true, default: null })
+  resetPasswordToken: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
-  resetPasswordExpires: Date;
+  @Column({ type: 'timestamp', nullable: true, default: null })
+  resetPasswordExpires: Date | null;
 
   @Column({ type: 'bigint', default: 5368709120 })
   storageLimit: number;

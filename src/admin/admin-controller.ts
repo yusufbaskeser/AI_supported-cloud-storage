@@ -1,7 +1,14 @@
 import {
-  Controller, Get, Put, Delete,
-  Param, Query, Body, UseGuards,
-  ParseIntPipe, DefaultValuePipe,
+  Controller,
+  Get,
+  Put,
+  Delete,
+  Param,
+  Query,
+  Body,
+  UseGuards,
+  ParseIntPipe,
+  DefaultValuePipe,
 } from '@nestjs/common';
 import { AdminService } from './admin-service';
 import { UserRole } from '../entities/user-entity';
@@ -73,7 +80,10 @@ export class AdminController {
     @Param('id', ParseIntPipe) id: number,
     @Body('limitGB') limitGB: number,
   ) {
-    return this.adminService.updateStorageLimit(id, Math.round(limitGB * 1024 ** 3));
+    return this.adminService.updateStorageLimit(
+      id,
+      Math.round(limitGB * 1024 ** 3),
+    );
   }
 
   @UseGuards(EditorGuard)

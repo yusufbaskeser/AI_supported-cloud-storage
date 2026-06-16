@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, LessThan, Repository } from 'typeorm';
 import * as crypto from 'crypto';
@@ -13,8 +18,14 @@ import { VerifyEmailDto } from './dto/emailDto/verifyEmailDto';
 import { hashPassword } from '../utils/hash-password';
 import { comparePassword } from '../utils/compare-password';
 import { generateJwtToken } from '../utils/generate-jwt-token';
-import { validateRegister, validateLogin } from './auth-validations/auth-validations';
-import { sendResetPasswordLink, sendVerificationCode } from '../utils/send-mail';
+import {
+  validateRegister,
+  validateLogin,
+} from './auth-validations/auth-validations';
+import {
+  sendResetPasswordLink,
+  sendVerificationCode,
+} from '../utils/send-mail';
 import type { Client as MinioClient } from 'minio';
 import { createMinioClient } from '../utils/minio-client';
 
@@ -36,13 +47,16 @@ export class AuthService {
   @Cron(CronExpression.EVERY_MINUTE)
   async handleExpiredUsersCleanup() {
     const expiredUsers = await this.userRepository.find({
-      where: { is_verified: false, verification_code_expires: LessThan(new Date()) },
+      where: {
+        is_verified: false,
+        verification_code_expires: LessThan(new Date()),
+      },
       select: ['user_id'],
     });
 
     if (expiredUsers.length === 0) return;
 
-    const userIds = expiredUsers.map(u => u.user_id);
+    const userIds = expiredUsers.map((u) => u.user_id);
 
     const files = await this.fileRepository
       .createQueryBuilder('f')
@@ -52,7 +66,12 @@ export class AuthService {
       .getMany();
 
     if (files.length > 0) {
-      await this.minioClient.removeObjects(this.bucketName, files.map(f => f.minio_path)).catch(() => {});
+      await this.minioClient
+        .removeObjects(
+          this.bucketName,
+          files.map((f) => f.minio_path),
+        )
+        .catch(() => {});
     }
 
     await this.userRepository.delete(userIds);
@@ -65,7 +84,7 @@ export class AuthService {
     await validateRegister(this.userRepository, email);
 
     const hashedPassword = await hashPassword(password);
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpCode = crypto.randomInt(100000, 999999).toString();
     const expires = new Date();
     expires.setMinutes(expires.getMinutes() + 5);
 
@@ -82,25 +101,38 @@ export class AuthService {
     await this.userRepository.save(newUser);
     await sendVerificationCode(newUser.email, otpCode);
 
-    return { message: 'Register successful! Please check your email for the verification code.' };
+    return {
+      message:
+        'Register successful! Please check your email for the verification code.',
+    };
   }
 
   async verifyEmail(dto: VerifyEmailDto): Promise<{ message: string }> {
     const email = dto.email.trim().toLowerCase();
     const user = await this.userRepository.findOne({ where: { email } });
 
-    if (!user || user.verification_code !== dto.code) {
+    if (!user) {
       throw new UnauthorizedException('Invalid code or user not found!');
     }
 
-    if (!user.verification_code_expires || new Date() > user.verification_code_expires) {
-      throw new UnauthorizedException('Code has expired, please request a new one!');
+    if (user.verification_code !== dto.code) {
+      throw new UnauthorizedException('Invalid code or user not found!');
+    }
+
+    if (
+      !user.verification_code_expires ||
+      new Date() > user.verification_code_expires
+    ) {
+      throw new UnauthorizedException(
+        'Code has expired, please request a new one!',
+      );
     }
 
     user.is_verified = true;
     user.verification_code = null;
     user.verification_code_expires = null;
     await this.userRepository.save(user);
+    
 
     return { message: 'Account verified successfully!' };
   }
@@ -113,10 +145,13 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const isPasswordValid = await comparePassword(password, user.password);
-    if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials');
+    if (!isPasswordValid)
+      throw new UnauthorizedException('Invalid credentials');
 
     if (!user.is_verified) {
-      throw new UnauthorizedException('Account not verified. Please check your email for the verification code.');
+      throw new UnauthorizedException(
+        'Account not verified. Please check your email for the verification code.',
+      );
     }
 
     const token = generateJwtToken({
@@ -131,7 +166,9 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<{ message: string }> {
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.userRepository.findOne({ where: { email: normalizedEmail } });
+    const user = await this.userRepository.findOne({
+      where: { email: normalizedEmail },
+    });
     if (!user) throw new NotFoundException('No user found with that email.');
 
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -146,16 +183,22 @@ export class AuthService {
     return { message: 'Password reset link sent to your email.' };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({
-      where: { resetPasswordToken: token, resetPasswordExpires: MoreThan(new Date()) },
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: MoreThan(new Date()),
+      },
     });
 
     if (!user) throw new BadRequestException('Expired or invalid token.');
 
     user.password = await hashPassword(newPassword);
-    user.resetPasswordToken = null!;
-    user.resetPasswordExpires = null!;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
     await this.userRepository.save(user);
 
     return { message: 'Password updated successfully.' };

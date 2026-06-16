@@ -12,8 +12,8 @@ import { UserUpdateRequestDto } from './dto/userUpdateRequestDto';
 import { UserUpdateResponseDto } from './dto/userUpdateResponseDto';
 import { UserDeleteResponseDto } from './dto/userDeleteResponseDto';
 import { validateUserExists } from './user-validations/user-validations';
-import { hashPassword } from 'src/utils/hash-password';
-import { createMinioClient } from 'src/utils/minio-client';
+import { hashPassword } from '../utils/hash-password';
+import { createMinioClient } from '../utils/minio-client';
 
 @Injectable()
 export class UserService {
@@ -44,7 +44,10 @@ export class UserService {
     };
   }
 
-  async updateUser(user_id: number, dto: UserUpdateRequestDto): Promise<UserUpdateResponseDto> {
+  async updateUser(
+    user_id: number,
+    dto: UserUpdateRequestDto,
+  ): Promise<UserUpdateResponseDto> {
     const user = await validateUserExists(this.userRepository, user_id);
 
     if (dto.name) user.name = dto.name;
@@ -52,7 +55,9 @@ export class UserService {
     if (dto.profile_photo !== undefined) user.profile_photo = dto.profile_photo;
 
     await this.userRepository.save(user);
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/users/${user_id}`);
+    await this.cacheManager.del(
+      `cache_user_${user_id}_url_/v1/users/${user_id}`,
+    );
 
     return { message: 'User updated successfully' };
   }
@@ -68,11 +73,16 @@ export class UserService {
       .getMany();
 
     if (files.length > 0) {
-      await this.minioClient.removeObjects(this.bucketName, files.map(f => f.minio_path));
+      await this.minioClient.removeObjects(
+        this.bucketName,
+        files.map((f) => f.minio_path),
+      );
     }
 
     await this.userRepository.delete({ user_id });
-    await this.cacheManager.del(`cache_user_${user_id}_url_/v1/users/${user_id}`);
+    await this.cacheManager.del(
+      `cache_user_${user_id}_url_/v1/users/${user_id}`,
+    );
     return { message: 'User deleted successfully' };
   }
 }

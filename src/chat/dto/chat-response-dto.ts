@@ -9,7 +9,14 @@ export class ChatResponseDto {
     uploaded_at?: Date;
   }>;
   stats?: any;
-  action: 'search_files' | 'stats' | 'general' | 'generate_link' | 'delete_files' | 'delete_workspace' | 'rename_file';
+  action:
+    | 'search_files'
+    | 'stats'
+    | 'general'
+    | 'generate_link'
+    | 'delete_files'
+    | 'delete_workspace'
+    | 'rename_file';
   toast?: string;
   workspace_id?: number;
   workspace_name?: string;

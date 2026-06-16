@@ -109,7 +109,7 @@ export async function sendResetPasswordLink(email: string, resetLink: string) {
   await transporter.sendMail({
     from: `"Synapse Cloud" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: 'Şifre Yenileme Talebi',
+    subject: 'Password Reset Request',
     html: htmlContent,
   });
 }
